@@ -1,0 +1,10 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "paths": {
+      "expo-smartrefreshlayout": ["../src/index"],
+      "expo-smartrefreshlayout/*": ["../src/*"]
+    }
+  }
+}

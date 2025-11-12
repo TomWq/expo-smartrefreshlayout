@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["ExpoSmartrefreshlayoutModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.smartrefreshlayout.ExpoSmartrefreshlayoutModule"]
+  }
+}

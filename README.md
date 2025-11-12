@@ -1,0 +1,761 @@
+# expo-smartrefreshlayout
+
+一个功能强大的 React Native 下拉刷新和上拉加载组件，基于原生实现：
+- Android: [SmartRefreshLayout](https://github.com/scwang90/SmartRefreshLayout)
+- iOS: [MJRefresh](https://github.com/CoderMJLee/MJRefresh)
+
+## ✨ 特性
+
+- ✅ 支持下拉刷新和上拉加载
+- ✅ 支持自定义刷新头和加载尾样式
+- ✅ 支持经典（Classic）和 Material Design 两种样式
+- ✅ 丰富的配置选项和事件回调
+- ✅ 完整的 TypeScript 类型定义
+- ✅ 支持自动加载更多
+- ✅ 支持嵌套滚动
+- ✅ 流畅的动画效果
+- ✅ 跨平台支持（Android & iOS）
+- ✅ 支持自定义 Header 组件
+- ✅ 完整的状态追踪和实时回调
+
+## 📦 安装
+
+```bash
+npm install expo-smartrefreshlayout
+# 或
+yarn add expo-smartrefreshlayout
+# 或
+pnpm add expo-smartrefreshlayout
+```
+
+## 🚀 快速开始
+
+### 基础用法
+
+```tsx
+import { ExpoSmartrefreshlayoutView } from 'expo-smartrefreshlayout';
+import { FlatList, View, Text } from 'react-native';
+
+function App() {
+  const [data, setData] = useState([1, 2, 3, 4, 5]);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = () => {
+    console.log('开始刷新');
+    // 模拟网络请求
+    setTimeout(() => {
+      setData([...Array(5)].map((_, i) => i + 1));
+      // 刷新完成后需要手动调用 finishRefresh
+      // 注意：Android 会在 3 秒后自动结束刷新
+    }, 2000);
+  };
+
+  const handleLoadMore = () => {
+    console.log('开始加载更多');
+    // 模拟加载更多
+    setTimeout(() => {
+      setData([...data, ...Array(5)].map((_, i) => data.length + i + 1)]);
+    }, 2000);
+  };
+
+  return (
+    <ExpoSmartrefreshlayoutView
+      style={{ flex: 1 }}
+      onRefresh={handleRefresh}
+      onLoadMore={handleLoadMore}
+    >
+      <FlatList
+        data={data}
+        renderItem={({ item }) => (
+          <View style={{ padding: 20, borderBottomWidth: 1 }}>
+            <Text>Item {item}</Text>
+          </View>
+        )}
+        keyExtractor={(item) => item.toString()}
+      />
+    </ExpoSmartrefreshlayoutView>
+  );
+}
+```
+
+### 调用方法
+
+方法通过 Module 暴露，直接导入使用：
+
+```tsx
+import { ExpoSmartrefreshlayoutView, ExpoSmartrefreshlayoutModule } from 'expo-smartrefreshlayout';
+
+function App() {
+  const handleRefresh = async () => {
+    try {
+      // 执行刷新逻辑
+      await fetchData();
+      // 刷新成功
+      ExpoSmartrefreshlayoutModule.finishRefresh(true, 300);
+    } catch (error) {
+      // 刷新失败
+      ExpoSmartrefreshlayoutModule.finishRefresh(false, 300);
+    }
+  };
+
+  const handleLoadMore = async () => {
+    try {
+      const newData = await loadMoreData();
+      if (newData.length === 0) {
+        // 没有更多数据
+        ExpoSmartrefreshlayoutModule.finishLoadMore(true, 0, true);
+      } else {
+        // 加载成功
+        ExpoSmartrefreshlayoutModule.finishLoadMore(true, 300);
+      }
+    } catch (error) {
+      // 加载失败
+      ExpoSmartrefreshlayoutModule.finishLoadMore(false, 300);
+    }
+  };
+
+  return (
+    <ExpoSmartrefreshlayoutView
+      onRefresh={handleRefresh}
+      onLoadMore={handleLoadMore}
+    >
+      {/* 你的内容 */}
+    </ExpoSmartrefreshlayoutView>
+  );
+}
+```
+
+## 📖 API 文档
+
+### Props
+
+#### 基础配置
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `enableRefresh` | `boolean` | `true` | 是否启用下拉刷新功能 |
+| `enableLoadMore` | `boolean` | `true` | 是否启用上拉加载功能 |
+| `enableAutoLoadMore` | `boolean` | `false` | 是否启用列表惯性滑动到底部时自动加载更多 |
+| `enablePureScrollMode` | `boolean` | `false` | 是否启用纯滚动模式（Android 专属） |
+| `renderHeader` | `() => React.ReactElement` | - | 自定义 Header 组件渲染函数，提供后将自动使用自定义 Header |
+| `renderFooter` | `() => React.ReactElement` | - | 自定义 Footer 组件渲染函数，提供后将自动使用自定义 Footer |
+
+#### 样式配置
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `headerType` | `'classics' \| 'material'` | `'classics'` | Header 类型 |
+| `headerHeight` | `number` | `60` | Header 标准高度（dp/pt） |
+| `footerHeight` | `number` | `60` | Footer 标准高度（dp/pt） |
+| `headerInsetStart` | `number` | `0` | Header 起始位置偏移量（Android 专属） |
+| `footerInsetStart` | `number` | `0` | Footer 起始位置偏移量（Android 专属） |
+
+#### 拖拽配置
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `dragRate` | `number` | `0.5` | 阻尼系数：显示高度/手指滑动距离（Android 专属） |
+| `headerMaxDragRate` | `number` | `2.0` | Header 最大拖拽距离 / Header 标准高度（Android 专属） |
+| `footerMaxDragRate` | `number` | `2.0` | Footer 最大拖拽距离 / Footer 标准高度（Android 专属） |
+| `headerTriggerRate` | `number` | `1.0` | 刷新触发比率（Android 专属） |
+| `footerTriggerRate` | `number` | `1.0` | 加载更多触发比率（Android 专属） |
+| `reboundDuration` | `number` | `300` | 回弹动画时长（毫秒，Android 专属） |
+
+#### 滚动配置
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `enableScrollContentWhenLoaded` | `boolean` | `true` | 是否在加载完成时滚动列表显示新内容（Android 专属） |
+| `enableScrollContentWhenRefreshed` | `boolean` | `true` | 是否在刷新完成时滚动列表显示新内容（Android 专属） |
+| `enableOverScrollDrag` | `boolean` | `true` | 是否启用越界拖动（仿苹果效果） |
+| `enableOverScrollBounce` | `boolean` | `true` | 是否启用越界回弹 |
+| `enableNestedScroll` | `boolean` | `true` | 是否启用嵌套滚动（Android 专属） |
+
+#### 动画配置
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `enableHeaderTranslationContent` | `boolean` | `true` | 是否下拉 Header 时向下平移列表（Android 专属） |
+| `enableFooterTranslationContent` | `boolean` | `true` | 是否上拉 Footer 时向上平移列表（Android 专属） |
+| `enableLoadMoreWhenContentNotFull` | `boolean` | `false` | 是否在列表不满一页时开启上拉加载 |
+
+#### 经典样式配置
+
+##### ClassicRefreshHeaderProps
+
+```tsx
+classicRefreshHeaderProps={{
+  headerAccentColor: '#007AFF',        // 强调颜色
+  headerPrimaryColor: '#FFFFFF',       // 主题颜色（背景色）
+  headerTitleTextSize: 16,             // 标题文字大小（sp）
+  headerTimeTextSize: 12,              // 时间文字大小（sp）
+  headerShowTime: true,                // 是否显示时间
+  headerFinishDuration: 500,           // 刷新完成停留时间（毫秒）
+  headerDrawableSize: 20,              // 图标大小（dp）
+  headerDrawableMarginRight: 10,       // 图标与文字间距（dp）
+  headerLastUpdateText: '上次更新时间', // 手动设置时间文字
+  
+  // 状态文字（iOS & Android）
+  REFRESH_HEADER_PULLING: '下拉刷新',
+  REFRESH_HEADER_RELEASE: '释放刷新',
+  REFRESH_HEADER_REFRESHING: '正在刷新...',
+  REFRESH_HEADER_FINISH: '刷新完成',
+}}
+```
+
+##### ClassicLoadMoreFooterProps
+
+```tsx
+classicLoadMoreFooterProps={{
+  footerAccentColor: '#007AFF',        // 强调颜色
+  footerPrimaryColor: '#FFFFFF',       // 主题颜色（背景色）
+  footerTitleTextSize: 14,             // 标题文字大小（sp）
+  footerFinishDuration: 500,           // 加载完成停留时间（毫秒）
+  footerDrawableSize: 20,              // 图标大小（dp）
+  footerDrawableMarginRight: 10,       // 图标与文字间距（dp）
+  
+  // 状态文字（iOS & Android）
+  REFRESH_FOOTER_PULLING: '上拉加载更多',
+  REFRESH_FOOTER_RELEASE: '释放加载',
+  REFRESH_FOOTER_LOADING: '正在加载...',
+  REFRESH_FOOTER_FINISH: '加载完成',
+  REFRESH_FOOTER_NOTHING: '没有更多数据',
+}}
+```
+
+#### 事件回调
+
+| 事件 | 参数 | 说明 |
+|------|------|------|
+| `onRefresh` | `() => void` | 下拉刷新回调 |
+| `onLoadMore` | `() => void` | 上拉加载回调 |
+| `onStateChanged` | `(event: {state: RefreshState}) => void` | 状态改变回调 |
+| `onHeaderMoving` | `(event: HeaderMovingEvent) => void` | Header 移动回调 |
+| `onFooterMoving` | `(event: FooterMovingEvent) => void` | Footer 移动回调 |
+
+##### HeaderMovingEvent
+
+```typescript
+interface HeaderMovingEvent {
+  isDragging: boolean;   // 是否正在拖拽
+  percent: number;       // 拖拽进度（0-N，超过1表示超过触发高度）
+  offset: number;        // 当前偏移量（dp/pt，已转换为逻辑像素）
+  headerHeight: number;  // Header 高度（dp/pt，已转换为逻辑像素）
+}
+```
+
+##### FooterMovingEvent
+
+```typescript
+interface FooterMovingEvent {
+  isDragging: boolean;   // 是否正在拖拽
+  percent: number;       // 拖拽进度（0-N）
+  offset: number;        // 当前偏移量（dp/pt）
+  footerHeight: number;  // Footer 高度（dp/pt）
+}
+```
+
+##### RefreshState 枚举
+
+```typescript
+enum RefreshState {
+  None = 0,              // 无状态
+  PullDownToRefresh = 1, // 下拉刷新
+  ReleaseToRefresh = 2,  // 释放刷新
+  Refreshing = 3,        // 正在刷新
+  RefreshFinish = 4,     // 刷新完成
+  PullUpToLoad = 5,      // 上拉加载
+  ReleaseToLoad = 6,     // 释放加载
+  Loading = 7,           // 正在加载
+  LoadFinish = 8,        // 加载完成
+  NoMoreData = 9,        // 没有更多数据
+}
+```
+
+### 方法（通过 Module 调用）
+
+所有方法通过 `ExpoSmartrefreshlayoutModule` 调用：
+
+```tsx
+import { ExpoSmartrefreshlayoutModule } from 'expo-smartrefreshlayout';
+
+// 完成刷新操作
+ExpoSmartrefreshlayoutModule.finishRefresh(success?: boolean, delay?: number);
+
+// 完成加载更多操作
+ExpoSmartrefreshlayoutModule.finishLoadMore(success?: boolean, delay?: number, noMoreData?: boolean);
+
+// 自动刷新
+ExpoSmartrefreshlayoutModule.autoRefresh(delay?: number);
+
+// 自动加载更多
+ExpoSmartrefreshlayoutModule.autoLoadMore(delay?: number);
+
+// 设置是否没有更多数据
+ExpoSmartrefreshlayoutModule.setNoMoreData(noMoreData: boolean);
+```
+
+#### finishRefresh
+
+完成刷新操作。
+
+```tsx
+import { ExpoSmartrefreshlayoutModule } from 'expo-smartrefreshlayout';
+
+// 刷新成功
+ExpoSmartrefreshlayoutModule.finishRefresh(true, 300);
+
+// 刷新失败
+ExpoSmartrefreshlayoutModule.finishRefresh(false, 300);
+```
+
+**参数：**
+- `success` (boolean, 可选): 是否刷新成功，默认 `true`
+- `delay` (number, 可选): 延迟时间（毫秒），默认 `0`
+
+#### finishLoadMore
+
+完成加载更多操作。
+
+```tsx
+import { ExpoSmartrefreshlayoutModule } from 'expo-smartrefreshlayout';
+
+// 加载成功
+ExpoSmartrefreshlayoutModule.finishLoadMore(true, 300);
+
+// 加载失败
+ExpoSmartrefreshlayoutModule.finishLoadMore(false, 300);
+
+// 没有更多数据
+ExpoSmartrefreshlayoutModule.finishLoadMore(true, 0, true);
+```
+
+**参数：**
+- `success` (boolean, 可选): 是否加载成功，默认 `true`
+- `delay` (number, 可选): 延迟时间（毫秒），默认 `0`
+- `noMoreData` (boolean, 可选): 是否没有更多数据，默认 `false`
+
+#### autoRefresh
+
+触发自动刷新。
+
+```tsx
+import { ExpoSmartrefreshlayoutModule } from 'expo-smartrefreshlayout';
+
+// 立即刷新
+ExpoSmartrefreshlayoutModule.autoRefresh();
+
+// 延迟 500ms 后刷新
+ExpoSmartrefreshlayoutModule.autoRefresh(500);
+```
+
+**参数：**
+- `delay` (number, 可选): 延迟时间（毫秒），默认 `0`
+
+#### autoLoadMore
+
+触发自动加载更多。
+
+```tsx
+import { ExpoSmartrefreshlayoutModule } from 'expo-smartrefreshlayout';
+
+ExpoSmartrefreshlayoutModule.autoLoadMore();
+```
+
+**参数：**
+- `delay` (number, 可选): 延迟时间（毫秒），默认 `0`
+
+#### setNoMoreData
+
+设置没有更多数据状态。
+
+```tsx
+import { ExpoSmartrefreshlayoutModule } from 'expo-smartrefreshlayout';
+
+// 设置没有更多数据
+ExpoSmartrefreshlayoutModule.setNoMoreData(true);
+
+// 重置状态
+ExpoSmartrefreshlayoutModule.setNoMoreData(false);
+```
+
+**参数：**
+- `noMoreData` (boolean): 是否没有更多数据
+
+## 🎨 高级用法
+
+### 自定义 Header
+
+你可以完全自定义 Header 的外观和动画效果，通过 `renderHeader` 属性提供自定义组件。
+
+#### 基础用法
+
+```tsx
+import { ExpoSmartrefreshlayoutView, ExpoSmartrefreshlayoutModule } from 'expo-smartrefreshlayout';
+import { View, Text, FlatList } from 'react-native';
+import { useState } from 'react';
+
+function CustomHeaderExample() {
+  const [data, setData] = useState([1, 2, 3, 4, 5]);
+  const [offset, setOffset] = useState(0);
+  const [percent, setPercent] = useState(0);
+  
+  const handleRefresh = async () => {
+    // 执行刷新逻辑
+    await fetchData();
+    ExpoSmartrefreshlayoutModule.finishRefresh(true, 300);
+  };
+  
+  return (
+    <ExpoSmartrefreshlayoutView
+      headerHeight={80}  // 设置 Header 高度
+      renderHeader={() => (
+        // 自定义 Header 组件
+        <View style={{ 
+          height: 80, 
+          justifyContent: 'center', 
+          alignItems: 'center',
+          backgroundColor: '#f0f0f0'
+        }}>
+          <Text>下拉距离: {offset}dp</Text>
+          <Text>下拉进度: {(percent * 100).toFixed(0)}%</Text>
+          <Text>{percent >= 1 ? '释放刷新' : '继续下拉'}</Text>
+        </View>
+      )}
+      onHeaderMoving={(event) => {
+        setOffset(event.offset);
+        setPercent(event.percent);
+      }}
+      onRefresh={handleRefresh}
+    >
+      {/* 内容列表 */}
+      <FlatList
+        data={data}
+        renderItem={({ item }) => (
+          <View style={{ padding: 20, borderBottomWidth: 1 }}>
+            <Text>Item {item}</Text>
+          </View>
+        )}
+        keyExtractor={(item) => item.toString()}
+      />
+    </ExpoSmartrefreshlayoutView>
+  );
+}
+```
+
+#### 带动画的自定义 Header
+
+```tsx
+import { Animated, ActivityIndicator } from 'react-native';
+import { useRef } from 'react';
+import { RefreshState } from 'expo-smartrefreshlayout';
+
+function AnimatedCustomHeader() {
+  const [data, setData] = useState([1, 2, 3, 4, 5]);
+  const [refreshState, setRefreshState] = useState(RefreshState.None);
+  const rotateAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0)).current;
+
+  const handleStateChanged = (state: RefreshState) => {
+    console.log('刷新状态改变:', state);
+    setRefreshState(state);
+  };
+
+  const handleHeaderMoving = (event) => {
+    // 根据下拉进度更新动画
+    const { percent } = event;
+    
+    // 旋转动画：0-360度
+    rotateAnim.setValue(percent * 360);
+    
+    // 缩放动画：0-1
+    scaleAnim.setValue(Math.min(percent, 1));
+  };
+  
+  const handleRefresh = async () => {
+    // 执行刷新逻辑
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    setData([...Array(10)].map((_, i) => i + 1));
+    
+    ExpoSmartrefreshlayoutModule.finishRefresh(true, 300);
+  };
+  
+  const rotate = rotateAnim.interpolate({
+    inputRange: [0, 360],
+    outputRange: ['0deg', '360deg'],
+  });
+  
+  // 判断是否正在刷新
+  const isRefreshing = refreshState === RefreshState.Refreshing;
+  
+  // 根据状态显示不同文字
+  const getStateText = () => {
+    switch (refreshState) {
+      case RefreshState.PullDownToRefresh:
+        return '下拉刷新';
+      case RefreshState.ReleaseToRefresh:
+        return '释放刷新';
+      case RefreshState.Refreshing:
+        return '正在刷新...';
+      case RefreshState.RefreshFinish:
+        return '刷新完成';
+      default:
+        return '下拉刷新';
+    }
+  };
+  
+  return (
+    <ExpoSmartrefreshlayoutView
+      headerHeight={80}
+      renderHeader={() => (
+        // 自定义动画 Header
+        <View style={{ 
+          height: 80, 
+          justifyContent: 'center', 
+          alignItems: 'center',
+          backgroundColor: '#fff'
+        }}>
+          {isRefreshing ? (
+            <ActivityIndicator size="large" color="#007AFF" />
+          ) : (
+            <Animated.View
+              style={{
+                transform: [
+                  { rotate },
+                  { scale: scaleAnim }
+                ]
+              }}
+            >
+              <Text style={{ fontSize: 40 }}>↓</Text>
+            </Animated.View>
+          )}
+          <Text style={{ marginTop: 8, color: '#666' }}>
+            {getStateText()}
+          </Text>
+        </View>
+      )}
+      onStateChanged={handleStateChanged}
+      onHeaderMoving={handleHeaderMoving}
+      onRefresh={handleRefresh}
+    >
+      {/* 内容列表 */}
+      <FlatList
+        data={data}
+        renderItem={({ item }) => (
+          <View style={{ padding: 20, borderBottomWidth: 1 }}>
+            <Text>Item {item}</Text>
+          </View>
+        )}
+        keyExtractor={(item) => item.toString()}
+      />
+    </ExpoSmartrefreshlayoutView>
+  );
+}
+```
+
+#### 重要说明
+
+1. **renderHeader 属性**：通过 `renderHeader` 属性提供自定义 Header 组件，系统会自动识别并使用它
+
+2. **Header 高度**：建议设置 `headerHeight` 属性来指定 Header 的标准高度，这会影响触发刷新的时机
+
+3. **状态管理**：使用 `onStateChanged` 回调监听刷新状态变化，根据 `RefreshState` 枚举值控制 UI 显示
+   - `RefreshState.PullDownToRefresh`: 下拉中
+   - `RefreshState.ReleaseToRefresh`: 可以释放刷新
+   - `RefreshState.Refreshing`: 正在刷新
+   - `RefreshState.RefreshFinish`: 刷新完成
+
+4. **事件监听**：通过 `onHeaderMoving` 实时获取下拉状态（offset、percent 等），用于更新自定义 Header 的动画效果
+
+5. **刷新控制**：在 `onRefresh` 中处理刷新逻辑，完成后通过 `ExpoSmartrefreshlayoutModule.finishRefresh()` 结束刷新
+
+6. **跨平台兼容**：自定义 Header 在 Android 和 iOS 上都完全支持
+
+### 监听状态变化
+
+```tsx
+function StateExample() {
+  const handleStateChanged = (event: { state: RefreshState }) => {
+    switch (event.state) {
+      case RefreshState.PullDownToRefresh:
+        console.log('下拉刷新');
+        break;
+      case RefreshState.ReleaseToRefresh:
+        console.log('释放刷新');
+        break;
+      case RefreshState.Refreshing:
+        console.log('正在刷新');
+        break;
+      case RefreshState.RefreshFinish:
+        console.log('刷新完成');
+        break;
+    }
+  };
+  
+  return (
+    <ExpoSmartrefreshlayoutView
+      onStateChanged={handleStateChanged}
+    >
+      {/* 内容 */}
+    </ExpoSmartrefreshlayoutView>
+  );
+}
+```
+
+### Material Design 样式
+
+```tsx
+<ExpoSmartrefreshlayoutView
+  headerType="material"
+  classicRefreshHeaderProps={{
+    headerAccentColor: '#FF5722',
+  }}
+>
+  {/* 内容 */}
+</ExpoSmartrefreshlayoutView>
+```
+
+### 完整示例
+
+```tsx
+import React, { useState } from 'react';
+import { View, Text, FlatList, StyleSheet } from 'react-native';
+import { 
+  ExpoSmartrefreshlayoutView, 
+  ExpoSmartrefreshlayoutModule,
+  RefreshState 
+} from 'expo-smartrefreshlayout';
+
+export default function CompleteExample() {
+  const [data, setData] = useState([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  const [refreshState, setRefreshState] = useState(RefreshState.None);
+
+  const handleStateChanged = (state: RefreshState) => {
+    console.log('状态改变:', state);
+    setRefreshState(state);
+  };
+
+  const handleRefresh = async () => {
+    try {
+      // 模拟网络请求
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // 更新数据
+      const newData = Array.from({ length: 10 }, (_, i) => i + 1);
+      setData(newData);
+      
+      // 完成刷新
+      ExpoSmartrefreshlayoutModule.finishRefresh(true, 300);
+    } catch (error) {
+      ExpoSmartrefreshlayoutModule.finishRefresh(false, 300);
+    }
+  };
+
+  const handleLoadMore = async () => {
+    try {
+      // 模拟加载更多
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // 模拟没有更多数据的情况
+      if (data.length >= 50) {
+        ExpoSmartrefreshlayoutModule.finishLoadMore(true, 0, true);
+        return;
+      }
+      
+      // 添加更多数据
+      const moreData = Array.from(
+        { length: 10 }, 
+        (_, i) => data.length + i + 1
+      );
+      setData([...data, ...moreData]);
+      
+      // 完成加载
+      ExpoSmartrefreshlayoutModule.finishLoadMore(true, 300);
+    } catch (error) {
+      ExpoSmartrefreshlayoutModule.finishLoadMore(false, 300);
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <ExpoSmartrefreshlayoutView
+        style={styles.refresh}
+        headerType="classics"
+        enableRefresh={true}
+        enableLoadMore={true}
+        enableAutoLoadMore={false}
+        onRefresh={handleRefresh}
+        onLoadMore={handleLoadMore}
+        onStateChanged={handleStateChanged}
+        classicRefreshHeaderProps={{
+          headerAccentColor: '#007AFF',
+          headerPrimaryColor: '#FFFFFF',
+          REFRESH_HEADER_PULLING: '下拉可以刷新',
+          REFRESH_HEADER_RELEASE: '释放立即刷新',
+          REFRESH_HEADER_REFRESHING: '正在刷新数据...',
+          REFRESH_HEADER_FINISH: '刷新完成',
+        }}
+        classicLoadMoreFooterProps={{
+          footerAccentColor: '#007AFF',
+          footerPrimaryColor: '#FFFFFF',
+          REFRESH_FOOTER_PULLING: '上拉加载更多',
+          REFRESH_FOOTER_RELEASE: '释放立即加载',
+          REFRESH_FOOTER_LOADING: '正在加载...',
+          REFRESH_FOOTER_FINISH: '加载完成',
+          REFRESH_FOOTER_NOTHING: '已经到底了',
+        }}
+      >
+        <FlatList
+          data={data}
+          renderItem={({ item }) => (
+            <View style={styles.item}>
+              <Text style={styles.itemText}>Item {item}</Text>
+            </View>
+          )}
+          keyExtractor={(item) => item.toString()}
+        />
+      </ExpoSmartrefreshlayoutView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  refresh: {
+    flex: 1,
+  },
+  item: {
+    padding: 20,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  itemText: {
+    fontSize: 16,
+    color: '#333',
+  },
+});
+```
+
+## 📝 注意事项
+
+1. **Android 自动结束刷新**：在 Android 平台，如果 3 秒后没有调用 `finishRefresh`，系统会自动结束刷新状态
+2. **iOS 需要手动调用**：在 iOS 平台，必须手动调用 `finishRefresh` 或 `finishLoadMore` 来结束刷新/加载状态
+3. **状态管理**：建议使用 `onStateChanged` 回调来管理 UI 状态，而不是手动维护状态变量
+4. **自定义 Header**：使用自定义 Header 时，建议设置 `headerHeight` 属性以确保触发高度正确
+
+## 🤝 贡献
+
+欢迎提交 Issue 和 Pull Request！
+
+## 📄 许可证
+
+MIT
+
+## 🔗 相关链接
+
+- [SmartRefreshLayout (Android)](https://github.com/scwang90/SmartRefreshLayout)
+- [MJRefresh (iOS)](https://github.com/CoderMJLee/MJRefresh)
