@@ -1,7 +1,7 @@
 {
   "name": "expo-smartrefreshlayout",
   "version": "0.1.0",
-  "description": "安卓和 ios 的刷新控件",
+  "description": "一个功能强大的 React Native 下拉刷新和上拉加载组件，基于 Expo Modules 开发，使用原生库实现（Android: SmartRefreshLayout, iOS: MJRefresh）",
   "main": "build/index.js",
   "types": "build/index.d.ts",
   "scripts": {
@@ -18,8 +18,16 @@
   "keywords": [
     "react-native",
     "expo",
+    "expo-module",
     "expo-smartrefreshlayout",
-    "ExpoSmartrefreshlayout"
+    "refresh",
+    "pull-to-refresh",
+    "load-more",
+    "smartrefreshlayout",
+    "mjrefresh",
+    "android",
+    "ios",
+    "typescript"
   ],
   "repository": "https://github.com/TomWq/expo-smartrefreshlayout",
   "bugs": {

@@ -83,3 +83,6 @@ logs/
 *.tmp
 *.temp
 .cache/
+
+
+PUBLISHING.md
