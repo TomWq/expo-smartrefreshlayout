@@ -11,13 +11,14 @@
 - ✅ 支持下拉刷新和上拉加载
 - ✅ 支持自定义刷新头和加载尾样式
 - ✅ 支持经典（Classic）和 Material Design 两种样式
+- ✅ 支持 Lottie 动画集成，可实现精美的自定义动画效果
 - ✅ 丰富的配置选项和事件回调
 - ✅ 完整的 TypeScript 类型定义
 - ✅ 支持自动加载更多
 - ✅ 支持嵌套滚动
 - ✅ 流畅的动画效果
 - ✅ 跨平台支持（Android & iOS）
-- ✅ 支持自定义 Header 组件
+- ✅ 支持自定义 Header 组件（Footer 自定义功能待实现）
 - ✅ 完整的状态追踪和实时回调
 - ✅ 同时支持 React Native 新旧架构（Paper & Fabric）
 
