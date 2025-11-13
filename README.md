@@ -72,8 +72,8 @@ function App() {
     // 模拟网络请求
     setTimeout(() => {
       setData([...Array(5)].map((_, i) => i + 1));
-      // 刷新完成后需要手动调用 finishRefresh
-      // 注意：Android 会在 3 秒后自动结束刷新
+      // 刷新完成后调用 finishRefresh（推荐）
+      ExpoSmartrefreshlayoutModule.finishRefresh(true, 300);
     }, 2000);
   };
 
@@ -82,6 +82,8 @@ function App() {
     // 模拟加载更多
     setTimeout(() => {
       setData([...data, ...Array(5)].map((_, i) => data.length + i + 1)]);
+      // 加载完成后调用 finishLoadMore（推荐）
+      ExpoSmartrefreshlayoutModule.finishLoadMore(true, 300);
     }, 2000);
   };
 
@@ -352,6 +354,20 @@ ExpoSmartrefreshlayoutModule.autoLoadMore(delay?: number);
 // 设置是否没有更多数据
 ExpoSmartrefreshlayoutModule.setNoMoreData(noMoreData: boolean);
 ```
+
+> ⚠️ **重要提示：关于 finishRefresh/finishLoadMore**
+> 
+> 虽然组件内部实现了 **3 秒自动结束机制**（防止卡住），但**强烈建议手动调用这些方法**：
+> 
+> - ✅ **即时反馈**：数据加载完立即结束刷新动画，无需等待 3 秒
+> - ✅ **精确控制**：可以设置延迟时间，提供更好的视觉反馈
+> - ✅ **状态展示**：可以区分成功/失败状态，提升用户体验
+> - ✅ **性能优化**：避免不必要的等待时间
+> 
+> **不手动调用的后果：**
+> - 无论成功失败，都会在 3 秒后自动结束
+> - 无法向用户展示刷新失败的状态
+> - 快速刷新时仍需等待完整的 3 秒
 
 #### finishRefresh
 
