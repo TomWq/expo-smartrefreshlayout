@@ -44,17 +44,18 @@ class ExpoSmartrefreshlayoutModule : Module() {
 
             // Classic Header/Footer props
             Prop("classicRefreshHeaderProps") { view: ExpoSmartrefreshlayoutView, value: Map<String, Any?> -> 
-                android.util.Log.d("SmartRefresh", "Module Prop classicRefreshHeaderProps 接收到: $value")
                 view.setClassicRefreshHeaderProps(value)
             }
             Prop("classicLoadMoreFooterProps") { view: ExpoSmartrefreshlayoutView, value: Map<String, Any?> -> 
-                android.util.Log.d("SmartRefresh", "Module Prop classicLoadMoreFooterProps 接收到: $value")
                 view.setClassicLoadMoreFooterProps(value)
             }
             
             // Custom Header/Footer flags
             Prop<Boolean>("hasCustomHeader") { view, value -> view.setHasCustomHeader(value) }
             Prop<Boolean>("hasCustomFooter") { view, value -> view.setHasCustomFooter(value) }
+            
+            // Haptic Feedback
+            Prop<Boolean>("enableHapticFeedback") { view, value -> view.setEnableHapticFeedback(value) }
 
 
             // ------------------- Events -------------------

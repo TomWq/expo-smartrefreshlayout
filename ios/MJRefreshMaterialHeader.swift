@@ -4,6 +4,7 @@ import MJRefresh
 /**
  * Material Design 风格的刷新 Header
  * 完全模仿 Android Material Design 的原生效果
+ * 包含箭头和圆形进度指示器的完整实现
  */
 class MJRefreshMaterialHeader: MJRefreshHeader {
     
@@ -68,17 +69,16 @@ class MJRefreshMaterialHeader: MJRefreshHeader {
             
             switch state {
             case .idle:
-                // 闲置状态
+                // 闲置状态：隐藏进度圈
                 circularProgressView.stopAnimating()
                 circularProgressView.progress = 0
                 
             case .pulling:
-                // 下拉中
+                // 下拉中：显示静态圆弧
                 circularProgressView.stopAnimating()
-                // 进度指示器不显示（或根据下拉百分比显示）
                 
             case .refreshing:
-                // 刷新中
+                // 刷新中：显示旋转动画
                 circularProgressView.startAnimating()
                 
             case .willRefresh:
@@ -97,7 +97,7 @@ class MJRefreshMaterialHeader: MJRefreshHeader {
     
     override var pullingPercent: CGFloat {
         didSet {
-            // 根据下拉百分比更新进度（非刷新状态时）
+            // 根据下拉百分比更新圆弧进度（非刷新状态时）
             if state != .refreshing && state != .willRefresh {
                 let progress = min(pullingPercent, 1.0)
                 circularProgressView.progress = progress
@@ -311,5 +311,105 @@ private class MaterialCircularProgressView: UIView {
     
     deinit {
         displayLink?.invalidate()
+    }
+}
+
+// MARK: - Material 箭头视图（完全模仿 Android 原生）
+
+private class MaterialArrowView: UIView {
+    
+    // MARK: - 属性
+    
+    /// 主题颜色
+    var accentColor: UIColor = UIColor(red: 0.26, green: 0.52, blue: 0.96, alpha: 1.0) {
+        didSet {
+            arrowLayer.strokeColor = accentColor.cgColor
+        }
+    }
+    
+    /// 圆形背景层
+    private let backgroundCircleLayer = CAShapeLayer()
+    
+    /// 箭头形状层
+    private let arrowLayer = CAShapeLayer()
+    
+    /// 箭头线宽
+    private let lineWidth: CGFloat = 3.0
+    
+    // MARK: - 初始化
+    
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        setupLayers()
+    }
+    
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setupLayers()
+    }
+    
+    private func setupLayers() {
+        backgroundColor = .clear
+        
+        // 设置白色圆形背景 + 阴影（Android Material Design 特征）
+        backgroundCircleLayer.fillColor = UIColor.white.cgColor
+        backgroundCircleLayer.shadowColor = UIColor.black.cgColor
+        backgroundCircleLayer.shadowOffset = CGSize(width: 0, height: 2)
+        backgroundCircleLayer.shadowOpacity = 0.2
+        backgroundCircleLayer.shadowRadius = 4
+        layer.addSublayer(backgroundCircleLayer)
+        
+        // 设置箭头层
+        arrowLayer.fillColor = UIColor.clear.cgColor
+        arrowLayer.strokeColor = accentColor.cgColor
+        arrowLayer.lineWidth = lineWidth
+        arrowLayer.lineCap = .round
+        arrowLayer.lineJoin = .round
+        layer.addSublayer(arrowLayer)
+    }
+    
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        
+        // 更新圆形背景路径
+        let circlePath = UIBezierPath(ovalIn: bounds)
+        backgroundCircleLayer.path = circlePath.cgPath
+        backgroundCircleLayer.frame = bounds
+        
+        // 绘制箭头（向下的箭头）
+        updateArrowPath()
+    }
+    
+    private func updateArrowPath() {
+        let center = CGPoint(x: bounds.width / 2, y: bounds.height / 2)
+        let arrowSize: CGFloat = 16 // 箭头大小
+        
+        let path = UIBezierPath()
+        
+        // 箭头的三条线段（向下的箭头）
+        // 左斜线
+        path.move(to: CGPoint(x: center.x - arrowSize / 2, y: center.y - arrowSize / 4))
+        path.addLine(to: CGPoint(x: center.x, y: center.y + arrowSize / 4))
+        
+        // 右斜线
+        path.addLine(to: CGPoint(x: center.x + arrowSize / 2, y: center.y - arrowSize / 4))
+        
+        // 竖线（箭头杆）
+        path.move(to: CGPoint(x: center.x, y: center.y - arrowSize / 2))
+        path.addLine(to: CGPoint(x: center.x, y: center.y + arrowSize / 4))
+        
+        arrowLayer.path = path.cgPath
+        arrowLayer.frame = bounds
+    }
+    
+    // MARK: - 旋转控制
+    
+    func setRotation(_ angle: CGFloat) {
+        // 设置旋转变换
+        arrowLayer.transform = CATransform3DMakeRotation(angle, 0, 0, 1)
+    }
+    
+    func resetRotation() {
+        setRotation(0)
     }
 }

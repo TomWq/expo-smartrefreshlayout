@@ -41,8 +41,6 @@ class CustomRefreshFooter @JvmOverloads constructor(
         // 确保自定义视图本身也不拦截事件
         customView.isClickable = false
         customView.isFocusable = false
-        
-        android.util.Log.d("SmartRefresh", "CustomRefreshFooter 初始化完成")
     }
 
     override fun onInterceptTouchEvent(ev: android.view.MotionEvent?): Boolean {
@@ -69,7 +67,7 @@ class CustomRefreshFooter @JvmOverloads constructor(
     }
 
     override fun onInitialized(kernel: RefreshKernel, height: Int, maxDragHeight: Int) {
-        android.util.Log.d("SmartRefresh", "CustomRefreshFooter.onInitialized: height=$height, maxDragHeight=$maxDragHeight")
+        // 初始化完成
     }
 
     override fun onMoving(isDragging: Boolean, percent: Float, offset: Int, height: Int, maxDragHeight: Int) {
@@ -77,15 +75,14 @@ class CustomRefreshFooter @JvmOverloads constructor(
     }
 
     override fun onReleased(refreshLayout: RefreshLayout, height: Int, maxDragHeight: Int) {
-        android.util.Log.d("SmartRefresh", "CustomRefreshFooter.onReleased")
+        // 释放
     }
 
     override fun onStartAnimator(refreshLayout: RefreshLayout, height: Int, maxDragHeight: Int) {
-        android.util.Log.d("SmartRefresh", "CustomRefreshFooter.onStartAnimator")
+        // 开始动画
     }
 
     override fun onFinish(refreshLayout: RefreshLayout, success: Boolean): Int {
-        android.util.Log.d("SmartRefresh", "CustomRefreshFooter.onFinish: success=$success")
         return 0 // 返回 0 表示立即完成，不延迟
     }
 
@@ -96,13 +93,11 @@ class CustomRefreshFooter @JvmOverloads constructor(
     override fun isSupportHorizontalDrag(): Boolean = false
 
     override fun onStateChanged(refreshLayout: RefreshLayout, oldState: RefreshState, newState: RefreshState) {
-        android.util.Log.d("SmartRefresh", "CustomRefreshFooter.onStateChanged: $oldState -> $newState")
         // 可以根据状态变化更新自定义视图
     }
 
     override fun setNoMoreData(noMoreData: Boolean): Boolean {
         mNoMoreData = noMoreData
-        android.util.Log.d("SmartRefresh", "CustomRefreshFooter.setNoMoreData: $noMoreData")
         // 可以在这里更新自定义视图显示"没有更多数据"的状态
         return true
     }

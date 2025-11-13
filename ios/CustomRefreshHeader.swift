@@ -33,8 +33,6 @@ class CustomRefreshHeader: MJRefreshHeader {
         // 允许交互（React Native 组件需要）
         customView.isUserInteractionEnabled = true
         isUserInteractionEnabled = true
-        
-        print("[SmartRefresh iOS] CustomRefreshHeader 初始化，高度: \(customViewHeight)")
     }
     
     required init?(coder: NSCoder) {
@@ -44,7 +42,6 @@ class CustomRefreshHeader: MJRefreshHeader {
     override func prepare() {
         super.prepare()
         backgroundColor = .clear
-        print("[SmartRefresh iOS] CustomRefreshHeader prepare")
     }
     
     override func placeSubviews() {
@@ -57,8 +54,6 @@ class CustomRefreshHeader: MJRefreshHeader {
             width: bounds.width,
             height: customViewHeight
         )
-        
-        print("[SmartRefresh iOS] CustomRefreshHeader 布局: \(customView.frame)")
     }
     
     override var pullingPercent: CGFloat {
@@ -70,20 +65,7 @@ class CustomRefreshHeader: MJRefreshHeader {
     
     override var state: MJRefreshState {
         didSet {
-            switch state {
-            case .idle:
-                print("[SmartRefresh iOS] Header 状态: idle")
-            case .pulling:
-                print("[SmartRefresh iOS] Header 状态: pulling")
-            case .refreshing:
-                print("[SmartRefresh iOS] Header 状态: refreshing")
-            case .willRefresh:
-                print("[SmartRefresh iOS] Header 状态: willRefresh")
-            case .noMoreData:
-                print("[SmartRefresh iOS] Header 状态: noMoreData")
-            @unknown default:
-                break
-            }
+            // 状态变化时的处理（如需要可在这里添加逻辑）
         }
     }
 }

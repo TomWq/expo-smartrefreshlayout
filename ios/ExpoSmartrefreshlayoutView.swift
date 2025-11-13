@@ -49,6 +49,11 @@ class ExpoSmartrefreshlayoutView: ExpoView, UIScrollViewDelegate {
     private var customHeaderSet: Bool = false
     private var customHeaderView: UIView?
     
+    // 触觉反馈相关
+    private var enableHapticFeedback: Bool = true
+    private var hasTriggeredRefreshHaptic: Bool = false
+    private var hasTriggeredLoadMoreHaptic: Bool = false
+    
     // 经典样式配置
     private var classicRefreshHeaderPropsValue: [String: Any]?
     private var classicLoadMoreFooterPropsValue: [String: Any]?
@@ -72,7 +77,6 @@ class ExpoSmartrefreshlayoutView: ExpoView, UIScrollViewDelegate {
         
         // 如果启用了自定义 Header 且还没设置过，第一个非ScrollView子视图就是 Header
         if hasCustomHeader && !customHeaderSet && customHeaderView == nil && !(subview is UIScrollView) {
-            print("[SmartRefresh iOS] 检测到自定义 Header，类型: \(type(of: subview))")
             customHeaderView = subview
             customHeaderSet = true
             // 从视图层级中移除，稍后包装到 CustomRefreshHeader 中
@@ -87,7 +91,6 @@ class ExpoSmartrefreshlayoutView: ExpoView, UIScrollViewDelegate {
         
         // 查找 ScrollView 子类（FlatList、ScrollView 等）
         if let scrollView = subview as? UIScrollView {
-            print("[SmartRefresh iOS] 检测到 ScrollView")
             self.scrollView = scrollView
             scrollView.delegate = self
             setupRefreshControl()
@@ -151,6 +154,15 @@ class ExpoSmartrefreshlayoutView: ExpoView, UIScrollViewDelegate {
                     "headerHeight": Int(headerHeight)
                 ])
                 
+                // 触觉反馈：当下拉超过触发阈值时（percent >= 1.0），触发震动
+                if enableHapticFeedback && scrollView.isDragging && percent >= 1.0 && !hasTriggeredRefreshHaptic {
+                    let generator = UIImpactFeedbackGenerator(style: .light)
+                    generator.impactOccurred()
+                    hasTriggeredRefreshHaptic = true
+                } else if percent < 1.0 {
+                    hasTriggeredRefreshHaptic = false
+                }
+                
                 // 更新状态
                 if pullDownDistance < triggerDistance {
                     if currentState != "PullDownToRefresh" {
@@ -192,6 +204,15 @@ class ExpoSmartrefreshlayoutView: ExpoView, UIScrollViewDelegate {
                     "offset": offset,
                     "footerHeight": Int(footerHeight)
                 ])
+                
+                // 触觉反馈：当上拉超过触发阈值时（percent >= 1.0），触发震动
+                if enableHapticFeedback && scrollView.isDragging && percent >= 1.0 && !hasTriggeredLoadMoreHaptic {
+                    let generator = UIImpactFeedbackGenerator(style: .light)
+                    generator.impactOccurred()
+                    hasTriggeredLoadMoreHaptic = true
+                } else if percent < 1.0 {
+                    hasTriggeredLoadMoreHaptic = false
+                }
                 
                 // 更新状态
                 if bottomOffset < triggerDistance {
@@ -243,7 +264,6 @@ class ExpoSmartrefreshlayoutView: ExpoView, UIScrollViewDelegate {
         
         // 如果有自定义 Header 视图，使用它
         if let customView = customHeaderView {
-            print("[SmartRefresh iOS] 使用自定义 Header")
             let header = CustomRefreshHeader(customView: customView)
             header.refreshingBlock = { [weak self] in
                 self?.handleRefreshTriggered()
@@ -389,28 +409,23 @@ class ExpoSmartrefreshlayoutView: ExpoView, UIScrollViewDelegate {
                 if let text = props["REFRESH_HEADER_PULLING"] as? String {
                     header.setTitle(text, for: .idle)
                     header.setTitle(text, for: .pulling)
-                    print("[SmartRefresh] 更新 Header 文字: \(text) (状态: idle/pulling)")
                 }
             case "ReleaseToRefresh":
                 if let text = props["REFRESH_HEADER_RELEASE"] as? String {
                     header.setTitle(text, for: .willRefresh)
-                    print("[SmartRefresh] 更新 Header 文字: \(text) (状态: willRefresh)")
                 }
             case "Refreshing":
                 if let text = props["REFRESH_HEADER_REFRESHING"] as? String {
                     header.setTitle(text, for: .refreshing)
-                    print("[SmartRefresh] 更新 Header 文字: \(text) (状态: refreshing)")
                 }
             case "RefreshFinish":
                 if let text = props["REFRESH_HEADER_FINISH"] as? String {
                     header.setTitle(text, for: .noMoreData)
-                    print("[SmartRefresh] 更新 Header 文字: \(text) (状态: noMoreData)")
                 }
             case "None":
                 // 恢复到默认的 idle 文字
                 if let text = props["REFRESH_HEADER_PULLING"] as? String {
                     header.setTitle(text, for: .idle)
-                    print("[SmartRefresh] 更新 Header 文字（恢复）: \(text) (状态: idle)")
                 }
             default:
                 break
@@ -429,27 +444,22 @@ class ExpoSmartrefreshlayoutView: ExpoView, UIScrollViewDelegate {
             case "PullUpToLoad":
                 if let text = footerProps["REFRESH_FOOTER_PULLING"] as? String {
                     footer.stateLabel?.text = text
-                    print("[SmartRefresh] 更新 Footer 文字: \(text)")
                 }
             case "ReleaseToLoad":
                 if let text = footerProps["REFRESH_FOOTER_RELEASE"] as? String {
                     footer.stateLabel?.text = text
-                    print("[SmartRefresh] 更新 Footer 文字: \(text)")
                 }
             case "Loading":
                 if let text = footerProps["REFRESH_FOOTER_LOADING"] as? String {
                     footer.stateLabel?.text = text
-                    print("[SmartRefresh] 更新 Footer 文字: \(text)")
                 }
             case "LoadFinish":
                 if let text = footerProps["REFRESH_FOOTER_FINISH"] as? String {
                     footer.stateLabel?.text = text
-                    print("[SmartRefresh] 更新 Footer 文字: \(text)")
                 }
             case "NoMoreData":
                 if let text = footerProps["REFRESH_FOOTER_NOTHING"] as? String {
                     footer.stateLabel?.text = text
-                    print("[SmartRefresh] 更新 Footer 文字: \(text)")
                 }
             default:
                 break
@@ -554,17 +564,21 @@ class ExpoSmartrefreshlayoutView: ExpoView, UIScrollViewDelegate {
     }
     
     /**
+     * 设置是否启用触觉反馈
+     */
+    func setEnableHapticFeedback(_ value: Bool) {
+        enableHapticFeedback = value
+    }
+    
+    /**
      * 设置是否使用自定义 Header
      */
     func setHasCustomHeader(_ value: Bool) {
-        print("[SmartRefresh iOS] setHasCustomHeader: \(value), 当前状态: customHeaderSet=\(customHeaderSet)")
-        
         let oldValue = hasCustomHeader
         hasCustomHeader = value
         
         // 如果从 true 变为 false，需要清理状态
         if oldValue && !value {
-            print("[SmartRefresh iOS] 禁用自定义 Header，清理状态")
             customHeaderView = nil
             customHeaderSet = false
             
@@ -577,12 +591,9 @@ class ExpoSmartrefreshlayoutView: ExpoView, UIScrollViewDelegate {
         
         // 如果从 false 变为 true，尝试查找自定义 Header
         if !oldValue && value && !customHeaderSet {
-            print("[SmartRefresh iOS] 启用自定义 Header，尝试从现有子视图中查找")
-            
             // 遍历子视图，找到第一个非 ScrollView 的视图
             for subview in subviews {
                 if !(subview is UIScrollView) {
-                    print("[SmartRefresh iOS] 找到自定义 Header: \(type(of: subview))")
                     customHeaderView = subview
                     customHeaderSet = true
                     subview.removeFromSuperview()

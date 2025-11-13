@@ -2,7 +2,7 @@
  * @Author       : 尚博信_王强 wangqiang03@sunboxsoft.com
  * @Date         : 2025-11-12 10:14:48
  * @LastEditors  : 尚博信_王强 wangqiang03@sunboxsoft.com
- * @LastEditTime : 2025-11-12 18:17:02
+ * @LastEditTime : 2025-11-13 11:15:38
  * @FilePath     : /expo-smartrefreshlayout/example/App.tsx
  * @Description  : 
  * 
@@ -85,26 +85,26 @@ const [headerOffset, setHeaderOffset] = useState(0);
     <View style={styles.container}>
       <ExpoSmartrefreshlayoutView
         style={styles.refreshLayout}
-        
-        renderHeader={() => (
-            <View 
+         
+        // renderHeader={() => (
+        //     <View 
            
-            style={{ height: 80, backgroundColor: 'red' ,justifyContent: 'center', alignItems: 'center'}}>
-              {refreshState === RefreshState.PullDownToRefresh && (
-                <Text style={{ fontSize: 16, color: 'white' }}>下拉刷新</Text>
-              )}
-              {refreshState === RefreshState.ReleaseToRefresh && (
-                <Text style={{ fontSize: 16, color: 'white' }}>释放立即刷新</Text>
-              )}
-              {refreshState === RefreshState.Refreshing && (
-                <ActivityIndicator color="white" />
-              )}
-              {/* 根据下拉距离显示不同内容 */}
-              <Text style={{ fontSize: 14, color: 'white' }}>下拉距离: {headerOffset}px</Text>
-            </View>
-          )}
+        //     style={{ height: 80, backgroundColor: 'red' ,justifyContent: 'center', alignItems: 'center'}}>
+        //       {refreshState === RefreshState.PullDownToRefresh && (
+        //         <Text style={{ fontSize: 16, color: 'white' }}>下拉刷新</Text>
+        //       )}
+        //       {refreshState === RefreshState.ReleaseToRefresh && (
+        //         <Text style={{ fontSize: 16, color: 'white' }}>释放立即刷新</Text>
+        //       )}
+        //       {refreshState === RefreshState.Refreshing && (
+        //         <ActivityIndicator color="white" />
+        //       )}
+        //       {/* 根据下拉距离显示不同内容 */}
+        //       <Text style={{ fontSize: 14, color: 'white' }}>下拉距离: {headerOffset}px</Text>
+        //     </View>
+        //   )}
           
-        // headerType="material"
+        headerType="material"
         classicRefreshHeaderProps={{
           // 文字定制
           REFRESH_HEADER_PULLING: '下拉刷新',

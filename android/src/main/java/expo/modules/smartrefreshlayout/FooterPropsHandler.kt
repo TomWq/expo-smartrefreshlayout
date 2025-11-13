@@ -21,18 +21,14 @@ class FooterPropsHandler(
      * 应用 Footer 属性
      */
     fun applyProps(props: Map<String, Any?>?) {
-        android.util.Log.d("SmartRefresh", "FooterPropsHandler.applyProps 被调用，props = $props")
         props ?: return
         
         val footer = srl.refreshFooter
         if (footer !is ClassicsFooter) {
-            android.util.Log.w("SmartRefresh", "Footer 不是 ClassicsFooter 类型，类型 = ${footer?.javaClass?.simpleName}")
             return
         }
         
         try {
-            android.util.Log.d("SmartRefresh", "开始应用 Footer 属性，当前状态: ${srl.state}")
-            
             // 设置文字内容
             setTextContent(footer, props)
             
@@ -56,11 +52,8 @@ class FooterPropsHandler(
             
             // 设置间距
             setMargin(footer, props)
-            
-            android.util.Log.d("SmartRefresh", "Footer 属性已全部更新完成")
-        } catch (e: Throwable) {
-            android.util.Log.e("SmartRefresh", "设置 Footer 属性失败", e)
-            e.printStackTrace()
+        } catch (_: Throwable) {
+            // 静默处理异常
         }
     }
     
@@ -85,7 +78,6 @@ class FooterPropsHandler(
                         val field = ClassicsFooter::class.java.getDeclaredField(fieldName)
                         field.isAccessible = true
                         field.set(footer, value)
-                        android.util.Log.d("SmartRefresh", "设置 Footer $fieldName = $value")
                         
                         // 同时修改静态常量
                         when (propKey) {
@@ -104,8 +96,8 @@ class FooterPropsHandler(
                             "REFRESH_FOOTER_NOTHING" -> 
                                 com.scwang.smart.refresh.footer.ClassicsFooter.REFRESH_FOOTER_NOTHING = value
                         }
-                    } catch (e: Exception) {
-                        android.util.Log.e("SmartRefresh", "设置 Footer $fieldName 失败", e)
+                    } catch (_: Exception) {
+                        // 静默处理异常
                     }
                 }
             }
@@ -130,7 +122,6 @@ class FooterPropsHandler(
                         val view = field.get(footer)
                         if (view is android.widget.TextView) {
                             titleTextView = view
-                            android.util.Log.d("SmartRefresh", "找到 Footer TextView 字段: $fieldName")
                             break@outerLoop
                         }
                     } catch (_: NoSuchFieldException) {}
@@ -163,8 +154,6 @@ class FooterPropsHandler(
                 titleTextView.maxWidth = Int.MAX_VALUE
                 titleTextView.maxEms = Int.MAX_VALUE
                 titleTextView.requestLayout()
-                
-                android.util.Log.d("SmartRefresh", "Footer TextView 宽度已调整")
             } else {
                 // 通过遍历 View 树查找
                 titleTextView = findTextViewInTree(footer.view)
@@ -179,8 +168,8 @@ class FooterPropsHandler(
                     titleTextView.maxWidth = Int.MAX_VALUE
                 }
             }
-        } catch (e: Exception) {
-            android.util.Log.e("SmartRefresh", "调整 Footer TextView 失败", e)
+        } catch (_: Exception) {
+            // 静默处理异常
         }
     }
     
@@ -206,13 +195,11 @@ class FooterPropsHandler(
     private fun setColors(footer: ClassicsFooter, props: Map<String, Any?>) {
         props["footerAccentColor"]?.let { 
             if (it is String) {
-                android.util.Log.d("SmartRefresh", "设置 footerAccentColor = $it")
                 footer.setAccentColor(it.toColorInt())
             }
         }
         props["footerPrimaryColor"]?.let { 
             if (it is String) {
-                android.util.Log.d("SmartRefresh", "设置 footerPrimaryColor = $it")
                 footer.setPrimaryColor(it.toColorInt())
             }
         }
@@ -225,7 +212,6 @@ class FooterPropsHandler(
         props["footerTitleTextSize"]?.let { 
             if (it is Number) {
                 val spValue = it.toFloat()
-                android.util.Log.d("SmartRefresh", "设置 footerTitleTextSize = ${spValue}sp")
                 footer.setTextSizeTitle(spValue)
             }
         }
@@ -237,7 +223,6 @@ class FooterPropsHandler(
     private fun setOtherProps(footer: ClassicsFooter, props: Map<String, Any?>) {
         props["footerFinishDuration"]?.let { 
             if (it is Number) {
-                android.util.Log.d("SmartRefresh", "设置 footerFinishDuration = $it")
                 footer.setFinishDuration(it.toInt())
             }
         }
@@ -252,7 +237,6 @@ class FooterPropsHandler(
             if (it is Number) {
                 val dpValue = it.toDouble()
                 val pxValue = dpToPx(dpValue).toInt()
-                android.util.Log.d("SmartRefresh", "设置 Footer 箭头大小 = ${dpValue}dp (${pxValue}px)")
                 
                 if (dpValue == 0.0) {
                     // 隐藏箭头
@@ -280,14 +264,13 @@ class FooterPropsHandler(
                         val view = field.get(footer)
                         if (view is View) {
                             view.visibility = View.GONE
-                            android.util.Log.d("SmartRefresh", "已隐藏 Footer 箭头: $fieldName")
                         }
                     } catch (_: NoSuchFieldException) {}
                 }
                 searchClass = searchClass.superclass
             }
-        } catch (e: Exception) {
-            android.util.Log.e("SmartRefresh", "隐藏 Footer 箭头失败", e)
+        } catch (_: Exception) {
+            // 静默处理异常
         }
     }
     
@@ -309,14 +292,13 @@ class FooterPropsHandler(
                             layoutParams.width = pxValue
                             layoutParams.height = pxValue
                             view.layoutParams = layoutParams
-                            android.util.Log.d("SmartRefresh", "已设置 Footer $fieldName 大小为 ${pxValue}px")
                         }
                     } catch (_: NoSuchFieldException) {}
                 }
                 searchClass = searchClass.superclass
             }
-        } catch (e: Exception) {
-            android.util.Log.e("SmartRefresh", "设置 Footer 图标大小失败", e)
+        } catch (_: Exception) {
+            // 静默处理异常
         }
     }
     
@@ -326,7 +308,6 @@ class FooterPropsHandler(
     private fun setMargin(footer: ClassicsFooter, props: Map<String, Any?>) {
         props["footerDrawableMarginRight"]?.let { 
             if (it is Number) {
-                android.util.Log.d("SmartRefresh", "设置 footerDrawableMarginRight = $it")
                 footer.setDrawableMarginRight(dpToPx(it.toDouble()))
             }
         }

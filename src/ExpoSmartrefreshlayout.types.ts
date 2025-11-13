@@ -2,7 +2,7 @@
  * @Author       : 尚博信_王强 wangqiang03@sunboxsoft.com
  * @Date         : 2025-11-12 10:14:48
  * @LastEditors  : 尚博信_王强 wangqiang03@sunboxsoft.com
- * @LastEditTime : 2025-11-12 18:04:58
+ * @LastEditTime : 2025-11-13 11:10:16
  * @FilePath     : /expo-smartrefreshlayout/src/ExpoSmartrefreshlayout.types.ts
  * @Description  : 
  * 
@@ -399,6 +399,13 @@ export type ExpoSmartrefreshlayoutViewProps = {
    * iOS 的滚动视图嵌套机制与 Android 完全不同
    */
   enableNestedScroll?: boolean
+
+  /**
+   * 是否启用触觉反馈（震动反馈）
+   * 当下拉/上拉到可以释放刷新的临界点时，手机会震动提示
+   * @default true
+   */
+  enableHapticFeedback?: boolean
 
   /**
    *  Header 类型

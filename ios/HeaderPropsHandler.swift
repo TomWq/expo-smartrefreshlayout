@@ -90,18 +90,10 @@ class HeaderPropsHandler {
             header.setTitle(finishText, for: .noMoreData)
         }
         
-        // iOS MJRefresh 不支持的状态文字（记录日志）
-        if let loadingText = props["REFRESH_HEADER_LOADING"] as? String {
-            print("[SmartRefresh] iOS REFRESH_HEADER_LOADING=\(loadingText) 已接收，但 MJRefresh 没有对应状态")
-        }
-        
-        if let failedText = props["REFRESH_HEADER_FAILED"] as? String {
-            print("[SmartRefresh] iOS REFRESH_HEADER_FAILED=\(failedText) 已接收，但 MJRefresh 没有对应状态")
-        }
-        
-        if let secondaryText = props["REFRESH_HEADER_SECONDARY"] as? String {
-            print("[SmartRefresh] iOS REFRESH_HEADER_SECONDARY=\(secondaryText) 已接收，但 MJRefresh 没有对应状态")
-        }
+        // iOS MJRefresh 不支持的状态文字（静默处理）
+        _ = props["REFRESH_HEADER_LOADING"]
+        _ = props["REFRESH_HEADER_FAILED"]
+        _ = props["REFRESH_HEADER_SECONDARY"]
     }
     
     /**
@@ -126,9 +118,8 @@ class HeaderPropsHandler {
             }
         }
         
-        if let primaryColor = props["headerPrimaryColor"] as? String {
-            print("[SmartRefresh] iOS headerPrimaryColor=\(primaryColor) 已接收，但 MJRefresh 不支持背景色设置")
-        }
+        // iOS MJRefresh 不支持背景色设置
+        _ = props["headerPrimaryColor"]
     }
     
     /**
@@ -166,17 +157,9 @@ class HeaderPropsHandler {
             header.lastUpdatedTimeLabel?.isHidden = !showTime
         }
         
-        // 自定义时间文字（iOS MJRefresh 使用 setTitle 设置）
-        if let lastUpdateText = props["headerLastUpdateText"] as? String {
-            // 这个属性在 MJRefresh 中是最后更新时间的前缀，需要与时间标签配合使用
-            // 当前实现较为简单，仅记录日志
-            print("[SmartRefresh] iOS headerLastUpdateText=\(lastUpdateText) 已接收，但需要自定义时间格式器")
-        }
-        
-        // 完成后停留时长（iOS MJRefresh 不直接支持）
-        if let finishDuration = props["headerFinishDuration"] as? Int {
-            print("[SmartRefresh] iOS headerFinishDuration=\(finishDuration) 已接收，但 MJRefresh 不支持设置停留时长")
-        }
+        // iOS MJRefresh 不支持的属性（静默处理）
+        _ = props["headerLastUpdateText"]
+        _ = props["headerFinishDuration"]
     }
     
     /**
@@ -204,18 +187,11 @@ class HeaderPropsHandler {
             } else {
                 header.arrowView?.isHidden = false
                 // iOS 的 MJRefresh 箭头大小是固定的，无法直接修改
-                print("[SmartRefresh] iOS headerDrawableArrowSize=\(size) 已接收，但 MJRefresh 不支持动态调整箭头大小")
             }
         }
         
-        // 进度条大小（iOS 的 MJRefresh 不支持单独设置进度条大小）
-        if let progressSize = props["headerDrawableProgressSize"] as? CGFloat {
-            print("[SmartRefresh] iOS headerDrawableProgressSize=\(progressSize) 已接收，但 MJRefresh 不支持动态调整")
-        }
-        
-        // 图标间距（iOS 的 MJRefresh 不支持精确控制间距）
-        if let marginRight = props["headerDrawableMarginRight"] as? CGFloat {
-            print("[SmartRefresh] iOS headerDrawableMarginRight=\(marginRight) 已接收，但 MJRefresh 不支持精确控制间距")
-        }
+        // iOS MJRefresh 不支持的属性（静默处理）
+        _ = props["headerDrawableProgressSize"]
+        _ = props["headerDrawableMarginRight"]
     }
 }

@@ -21,18 +21,14 @@ class HeaderPropsHandler(
      * 应用 Header 属性
      */
     fun applyProps(props: Map<String, Any?>?) {
-        android.util.Log.d("SmartRefresh", "HeaderPropsHandler.applyProps 被调用，props = $props")
         props ?: return
         
         val header = srl.refreshHeader
         if (header !is ClassicsHeader) {
-            android.util.Log.w("SmartRefresh", "Header 不是 ClassicsHeader 类型，类型 = ${header?.javaClass?.simpleName}")
             return
         }
         
         try {
-            android.util.Log.d("SmartRefresh", "开始应用 Header 属性，当前状态: ${srl.state}")
-            
             // 设置文字内容
             setTextContent(header, props)
             
@@ -56,11 +52,8 @@ class HeaderPropsHandler(
             
             // 监听状态变化，确保刷新图片动画运行
             setupStateListener(header, props)
-            
-            android.util.Log.d("SmartRefresh", "Header 属性已全部更新完成")
-        } catch (e: Throwable) {
-            android.util.Log.e("SmartRefresh", "设置 Header 属性失败", e)
-            e.printStackTrace()
+        } catch (_: Throwable) {
+            // 静默处理异常
         }
     }
     
@@ -109,15 +102,14 @@ class HeaderPropsHandler(
                 if (imageView is android.widget.ImageView) {
                     val drawable = imageView.drawable
                     if (drawable is android.graphics.drawable.Animatable) {
-                        if (!(drawable as android.graphics.drawable.Animatable).isRunning) {
-                            (drawable as android.graphics.drawable.Animatable).start()
-                            android.util.Log.d("SmartRefresh", "【刷新中】启动刷新图片动画")
-                        }
+                    if (!(drawable as android.graphics.drawable.Animatable).isRunning) {
+                        (drawable as android.graphics.drawable.Animatable).start()
+                    }
                     }
                 }
             }
-        } catch (e: Exception) {
-            android.util.Log.e("SmartRefresh", "【刷新中】启动刷新图片动画失败", e)
+        } catch (_: Exception) {
+            // 静默处理异常
         }
     }
     
@@ -143,7 +135,6 @@ class HeaderPropsHandler(
                         val field = ClassicsHeader::class.java.getDeclaredField(fieldName)
                         field.isAccessible = true
                         field.set(header, value)
-                        android.util.Log.d("SmartRefresh", "设置 $fieldName = $value")
                         
                         // 同时修改静态常量
                         when (propKey) {
@@ -164,8 +155,8 @@ class HeaderPropsHandler(
                             "REFRESH_HEADER_UPDATE" -> 
                                 com.scwang.smart.refresh.header.ClassicsHeader.REFRESH_HEADER_UPDATE = value
                         }
-                    } catch (e: Exception) {
-                        android.util.Log.e("SmartRefresh", "设置 $fieldName 失败", e)
+                    } catch (_: Exception) {
+                        // 静默处理异常
                     }
                 }
             }
@@ -179,14 +170,12 @@ class HeaderPropsHandler(
         props["headerAccentColor"]?.let {
             if (it is String) {
                 val colorStr = normalizeColorString(it)
-                android.util.Log.d("SmartRefresh", "设置 headerAccentColor = $it -> $colorStr")
                 header.setAccentColor(colorStr.toColorInt())
             }
         }
         props["headerPrimaryColor"]?.let {
             if (it is String) {
                 val colorStr = normalizeColorString(it)
-                android.util.Log.d("SmartRefresh", "设置 headerPrimaryColor = $it -> $colorStr")
                 header.setPrimaryColor(colorStr.toColorInt())
             }
         }
@@ -218,14 +207,12 @@ class HeaderPropsHandler(
         props["headerTitleTextSize"]?.let { 
             if (it is Number) {
                 val spValue = it.toFloat()
-                android.util.Log.d("SmartRefresh", "设置 headerTitleTextSize = ${spValue}sp")
                 header.setTextSizeTitle(spValue)
             }
         }
         props["headerTimeTextSize"]?.let { 
             if (it is Number) {
                 val spValue = it.toFloat()
-                android.util.Log.d("SmartRefresh", "设置 headerTimeTextSize = ${spValue}sp")
                 header.setTextSizeTime(spValue)
             }
         }
@@ -240,7 +227,6 @@ class HeaderPropsHandler(
         }
         props["headerFinishDuration"]?.let { 
             if (it is Number) {
-                android.util.Log.d("SmartRefresh", "设置 headerFinishDuration = $it")
                 header.setFinishDuration(it.toInt())
             }
         }
@@ -260,7 +246,6 @@ class HeaderPropsHandler(
         headerArrowSize?.let {
             if (it is Number) {
                 val dpValue = it.toFloat()
-                android.util.Log.d("SmartRefresh", "设置 Header 箭头大小 = ${dpValue}dp")
                 header.setDrawableArrowSize(dpValue)
             }
         }
@@ -269,7 +254,6 @@ class HeaderPropsHandler(
         progressSize?.let {
             if (it is Number) {
                 val dpValue = it.toFloat()
-                android.util.Log.d("SmartRefresh", "设置 Header 刷新图片大小 = ${dpValue}dp")
                 header.setDrawableProgressSize(dpValue)
             }
         }
@@ -300,24 +284,17 @@ class HeaderPropsHandler(
                 }
             }
             
-            android.util.Log.d("SmartRefresh", "找到刷新图片视图: ${progressImageView != null}")
-            
             // 配置刷新图片（但不改变显示状态，让 ClassicsHeader 自己控制）
             progressImageView?.let { imageView ->
                 // 如果是 ImageView（包括 AppCompatImageView），配置动画和颜色
                 if (imageView is android.widget.ImageView) {
-                    android.util.Log.d("SmartRefresh", "刷新图片是 ImageView/AppCompatImageView")
-                    
                     // 获取 drawable
                     val drawable = imageView.drawable
-                    android.util.Log.d("SmartRefresh", "Drawable 类型: ${drawable?.javaClass?.simpleName}")
                     
                     // 启动动画
                     drawable?.let { d ->
                         if (d is android.graphics.drawable.Animatable) {
-                            android.util.Log.d("SmartRefresh", "Drawable 是 Animatable，启动动画")
                             (d as android.graphics.drawable.Animatable).start()
-                            android.util.Log.d("SmartRefresh", "已启动刷新图片动画")
                         }
                     }
                     
@@ -326,20 +303,16 @@ class HeaderPropsHandler(
                         if (color is String) {
                             try {
                                 imageView.setColorFilter(normalizeColorString(color).toColorInt())
-                                android.util.Log.d("SmartRefresh", "已设置 Header 刷新图片颜色: $color")
-                            } catch (e: Exception) {
-                                android.util.Log.w("SmartRefresh", "设置刷新图片颜色失败", e)
+                            } catch (_: Exception) {
+                                // 静默处理异常
                             }
                         }
                     }
                 }
-                
-                android.util.Log.d("SmartRefresh", "Header 刷新图片配置完成 - visibility=${imageView.visibility}, alpha=${imageView.alpha}, 类型=${imageView.javaClass.simpleName}")
-            } ?: android.util.Log.w("SmartRefresh", "未找到刷新图片视图！")
+            }
             
-        } catch (e: Exception) {
-            android.util.Log.e("SmartRefresh", "配置 Header 刷新图片失败", e)
-            e.printStackTrace()
+        } catch (_: Exception) {
+            // 静默处理异常
         }
     }
     
@@ -349,7 +322,6 @@ class HeaderPropsHandler(
     private fun setMargin(header: ClassicsHeader, props: Map<String, Any?>) {
         props["headerDrawableMarginRight"]?.let { 
             if (it is Number) {
-                android.util.Log.d("SmartRefresh", "设置 headerDrawableMarginRight = $it")
                 header.setDrawableMarginRight(dpToPx(it.toDouble()))
             }
         }

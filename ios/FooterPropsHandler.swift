@@ -50,13 +50,10 @@ class FooterPropsHandler {
      * @param props 属性映射表
      */
     static func applyGenericProps(footer: MJRefreshFooter, props: [String: Any]) {
-        // MJRefreshAutoFooter 的样式配置较为有限
-        // 主要记录不支持的属性
-        if props["REFRESH_FOOTER_PULLING"] != nil ||
-           props["REFRESH_FOOTER_LOADING"] != nil ||
-           props["REFRESH_FOOTER_NOTHING"] != nil {
-            print("[SmartRefresh] MJRefreshAutoFooter 不支持自定义文字，请使用手动触发模式（enableAutoLoadMore=false）")
-        }
+        // MJRefreshAutoFooter 的样式配置较为有限（静默处理）
+        _ = props["REFRESH_FOOTER_PULLING"]
+        _ = props["REFRESH_FOOTER_LOADING"]
+        _ = props["REFRESH_FOOTER_NOTHING"]
     }
     
     // MARK: - 私有方法
@@ -91,18 +88,10 @@ class FooterPropsHandler {
             footer.setTitle(nothingText, for: .noMoreData)
         }
         
-        // iOS MJRefresh 不支持的状态文字（记录日志）
-        if let refreshingText = props["REFRESH_FOOTER_REFRESHING"] as? String {
-            print("[SmartRefresh] iOS REFRESH_FOOTER_REFRESHING=\(refreshingText) 已接收，与 REFRESH_FOOTER_LOADING 含义相同")
-        }
-        
-        if let finishText = props["REFRESH_FOOTER_FINISH"] as? String {
-            print("[SmartRefresh] iOS REFRESH_FOOTER_FINISH=\(finishText) 已接收，但 MJRefresh 没有对应状态")
-        }
-        
-        if let failedText = props["REFRESH_FOOTER_FAILED"] as? String {
-            print("[SmartRefresh] iOS REFRESH_FOOTER_FAILED=\(failedText) 已接收，但 MJRefresh 没有对应状态")
-        }
+        // iOS MJRefresh 不支持的状态文字（静默处理）
+        _ = props["REFRESH_FOOTER_REFRESHING"]
+        _ = props["REFRESH_FOOTER_FINISH"]
+        _ = props["REFRESH_FOOTER_FAILED"]
     }
     
     /**
@@ -122,9 +111,8 @@ class FooterPropsHandler {
             footer.arrowView?.tintColor = color
         }
         
-        if let primaryColor = props["footerPrimaryColor"] as? String {
-            print("[SmartRefresh] iOS footerPrimaryColor=\(primaryColor) 已接收，但 MJRefresh 不支持背景色设置")
-        }
+        // iOS MJRefresh 不支持背景色设置
+        _ = props["footerPrimaryColor"]
     }
     
     /**
@@ -166,19 +154,12 @@ class FooterPropsHandler {
             } else {
                 footer.arrowView?.isHidden = false
                 // iOS 的 MJRefresh 箭头大小是固定的，无法直接修改
-                print("[SmartRefresh] iOS footerDrawableArrowSize=\(size) 已接收，但 MJRefresh 不支持动态调整箭头大小")
             }
         }
         
-        // 进度条大小（iOS 的 MJRefresh 不支持单独设置进度条大小）
-        if let progressSize = props["footerDrawableProgressSize"] as? CGFloat {
-            print("[SmartRefresh] iOS footerDrawableProgressSize=\(progressSize) 已接收，但 MJRefresh 不支持动态调整")
-        }
-        
-        // 图标间距（iOS 的 MJRefresh 不支持精确控制间距）
-        if let marginRight = props["footerDrawableMarginRight"] as? CGFloat {
-            print("[SmartRefresh] iOS footerDrawableMarginRight=\(marginRight) 已接收，但 MJRefresh 不支持精确控制间距")
-        }
+        // iOS MJRefresh 不支持的属性（静默处理）
+        _ = props["footerDrawableProgressSize"]
+        _ = props["footerDrawableMarginRight"]
     }
     
     /**
@@ -190,9 +171,7 @@ class FooterPropsHandler {
      * @param props 属性映射表
      */
     private static func setOtherProps(footer: MJRefreshBackNormalFooter, props: [String: Any]) {
-        // 完成后停留时长（iOS MJRefresh 不直接支持）
-        if let finishDuration = props["footerFinishDuration"] as? Int {
-            print("[SmartRefresh] iOS footerFinishDuration=\(finishDuration) 已接收，但 MJRefresh 不支持设置停留时长")
-        }
+        // iOS MJRefresh 不支持的属性（静默处理）
+        _ = props["footerFinishDuration"]
     }
 }

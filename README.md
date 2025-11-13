@@ -19,6 +19,7 @@
 - ✅ 跨平台支持（Android & iOS）
 - ✅ 支持自定义 Header 组件
 - ✅ 完整的状态追踪和实时回调
+- ✅ 同时支持 React Native 新旧架构（Paper & Fabric）
 
 ## 📦 安装
 
@@ -54,6 +55,15 @@ npm install expo
 npx react-native run-android
 npx react-native run-ios
 ```
+
+## 🏗️ 架构支持
+
+本组件基于 Expo Modules API 构建，**自动支持 React Native 的新旧架构**：
+
+- ✅ **旧架构（Paper）**：React Native < 0.74，使用传统 Bridge 通信
+- ✅ **新架构（Fabric）**：React Native >= 0.68，自动启用新架构特性
+- ✅ **零配置切换**：组件会根据项目架构自动适配，无需任何额外配置
+
 
 ## 🚀 快速开始
 
@@ -199,6 +209,7 @@ function App() {
 | `enableOverScrollDrag` | `boolean` | `true` | 是否启用越界拖动（仿苹果效果） |
 | `enableOverScrollBounce` | `boolean` | `true` | 是否启用越界回弹 |
 | `enableNestedScroll` | `boolean` | `true` | 是否启用嵌套滚动（Android 专属） |
+| `enableHapticFeedback` | `boolean` | `true` | 是否启用触觉反馈（震动提示） |
 
 #### 动画配置
 
@@ -626,6 +637,137 @@ function AnimatedCustomHeader() {
 }
 ```
 
+#### 使用 LottieView 实现复杂动画
+
+如果你需要更复杂的动画效果，可以结合 [lottie-react-native](https://github.com/lottie-react-native/lottie-react-native) 来实现：
+
+```bash
+# 安装 lottie-react-native
+npm install lottie-react-native
+# 或
+yarn add lottie-react-native
+```
+
+**实现下拉进度控制的 Lottie 动画：**
+
+```tsx
+import { RefreshState, ExpoSmartrefreshlayoutView, onHeaderMoveProps } from 'expo-smartrefreshlayout';
+import ExpoSmartrefreshlayoutModule from 'expo-smartrefreshlayout/ExpoSmartrefreshlayoutModule';
+import { useState, useRef } from 'react';
+import { FlatList, Text, View } from 'react-native';
+import LottieView from 'lottie-react-native';
+
+export default function LottieCustomHeader() {
+  const lottieRef = useRef<LottieView>(null);
+  const [data, setData] = useState([1, 2, 3, 4, 5]);
+  const [refreshState, setRefreshState] = useState(RefreshState.None);
+  const [animationProgress, setAnimationProgress] = useState(0);
+
+  const handleRefresh = async () => {
+    // 执行刷新逻辑
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    setData([...Array(10)].map((_, i) => i + 1));
+    
+    ExpoSmartrefreshlayoutModule.finishRefresh(true, 300);
+  };
+ 
+  const handleHeaderMoving = (event: onHeaderMoveProps) => {
+    const { percent, isDragging } = event;
+    
+    // 根据下拉百分比控制动画进度
+    // percent 范围是 0-1+，当达到触发刷新的阈值时会超过1
+    // 我们将其限制在 0-1 之间来控制动画
+    const progress = Math.min(percent, 1);
+    
+    if (isDragging) {
+      // 在拖动时更新动画进度
+      setAnimationProgress(progress);
+    }
+  };
+
+  const handleStateChanged = (state: RefreshState) => {
+    setRefreshState(state);
+    
+    // 当开始刷新时，播放完整动画
+    if (state === RefreshState.Refreshing) {
+      lottieRef.current?.play();
+    }
+  };
+
+  return (
+    <View style={{ flex: 1 }}>
+      <ExpoSmartrefreshlayoutView
+        style={{ flex: 1, backgroundColor: '#f5f5f5' }}
+        headerHeight={80}
+        renderHeader={() => (
+          // 自定义 Lottie 动画 Header
+          <View style={{ 
+            height: 80, 
+            justifyContent: 'center', 
+            alignItems: 'center',
+            backgroundColor: '#fff'
+          }}>
+            <LottieView
+              ref={lottieRef}
+              source={require('./assets/refresh-animation.json')}
+              style={{ width: 100, height: 100 }}
+              loop={refreshState === RefreshState.Refreshing}
+              autoPlay={refreshState === RefreshState.Refreshing}
+              progress={refreshState === RefreshState.Refreshing ? undefined : animationProgress}
+            />
+          </View>
+        )}
+        onHeaderMoving={handleHeaderMoving}
+        onStateChanged={handleStateChanged}
+        onRefresh={handleRefresh}
+      >
+        {/* 内容列表 */}
+        <FlatList
+          data={data}
+          style={{ flex: 1 }}
+          renderItem={({ item }) => (
+            <View style={{ padding: 20, borderBottomWidth: 1 }}>
+              <Text>Item {item}</Text>
+            </View>
+          )}
+          keyExtractor={(item) => item.toString()}
+        />
+      </ExpoSmartrefreshlayoutView>
+    </View>
+  );
+}
+```
+
+**关键点说明：**
+
+1. **动画进度控制**：
+   - 使用 `useState` 创建 `animationProgress` 状态来存储动画进度
+   - 在 `onHeaderMoving` 回调中根据 `percent`（下拉百分比）更新进度
+   - 将进度限制在 0-1 之间：`Math.min(percent, 1)`
+
+2. **LottieView 配置**：
+   - `ref={lottieRef}`：用于在刷新时调用 `play()` 方法
+   - `progress={animationProgress}`：下拉时根据进度显示对应动画帧
+   - `autoPlay={refreshState === RefreshState.Refreshing}`：刷新时自动播放
+   - `loop={refreshState === RefreshState.Refreshing}`：刷新时循环播放
+   - 刷新时将 `progress` 设为 `undefined`，让动画自动播放
+
+3. **状态区分**：
+   - **下拉时**：通过 `progress` 属性控制动画帧，跟随下拉距离
+   - **刷新时**：`progress` 为 `undefined`，启用 `autoPlay` 和 `loop` 自动循环播放
+   - **完成后**：动画停止在最后一帧
+
+4. **动画文件**：
+   - 从 [LottieFiles](https://lottiefiles.com/) 下载 JSON 格式的动画文件
+   - 放在项目的 `assets` 目录下
+   - 使用 `require()` 引入
+
+**效果：**
+- ✅ 下拉过程中，Lottie 动画会随着下拉距离逐帧变化
+- ✅ 释放刷新后，动画自动循环播放
+- ✅ 刷新完成后，动画停止
+- ✅ 提供更流畅、更精美的用户体验
+
 #### 重要说明
 
 1. **renderHeader 属性**：通过 `renderHeader` 属性提供自定义 Header 组件，系统会自动识别并使用它
@@ -687,6 +829,43 @@ function StateExample() {
   {/* 内容 */}
 </ExpoSmartrefreshlayoutView>
 ```
+
+### 触觉反馈（震动提示）
+
+组件默认启用触觉反馈功能，当你下拉或上拉到可以释放刷新的临界点时，手机会震动提示用户：
+
+```tsx
+<ExpoSmartrefreshlayoutView
+  enableHapticFeedback={true}  // 默认为 true，可以省略
+  onRefresh={handleRefresh}
+  onLoadMore={handleLoadMore}
+>
+  {/* 内容 */}
+</ExpoSmartrefreshlayoutView>
+```
+
+**如何工作：**
+- ✅ **下拉刷新**：当 `percent >= 1.0`（即下拉距离超过触发阈值）时触发震动
+- ✅ **上拉加载**：当 `percent >= 1.0`（即上拉距离超过触发阈值）时触发震动
+- ✅ **智能防抖**：同一次拖拽只会触发一次震动，避免连续震动
+- ✅ **跨平台支持**：Android 和 iOS 均完美支持
+
+**禁用触觉反馈：**
+
+```tsx
+<ExpoSmartrefreshlayoutView
+  enableHapticFeedback={false}  // 关闭震动反馈
+  onRefresh={handleRefresh}
+>
+  {/* 内容 */}
+</ExpoSmartrefreshlayoutView>
+```
+
+**实现细节：**
+- **Android**：使用 `HapticFeedbackConstants.CONTEXT_CLICK` 提供轻微震动
+- **iOS**：使用 `UIImpactFeedbackGenerator(style: .light)` 提供轻触感反馈
+- **性能优化**：震动仅在拖拽过程中触发一次，释放后重置状态
+
 
 ### 完整示例
 

@@ -59,6 +59,11 @@ public class ExpoSmartrefreshlayoutModule: Module {
             Prop("hasCustomHeader") { (view: ExpoSmartrefreshlayoutView, value: Bool) in
                 view.setHasCustomHeader(value)
             }
+            
+            // 触觉反馈
+            Prop("enableHapticFeedback") { (view: ExpoSmartrefreshlayoutView, value: Bool) in
+                view.setEnableHapticFeedback(value)
+            }
         }
         
         // ------------------- Commands/Functions -------------------

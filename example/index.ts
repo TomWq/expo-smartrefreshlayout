@@ -1,3 +1,13 @@
+/*
+ * @Author       : 尚博信_王强 wangqiang03@sunboxsoft.com
+ * @Date         : 1985-10-26 16:15:00
+ * @LastEditors  : 尚博信_王强 wangqiang03@sunboxsoft.com
+ * @LastEditTime : 2025-11-13 11:28:47
+ * @FilePath     : /expo-smartrefreshlayout/example/index.ts
+ * @Description  : 
+ * 
+ * Copyright (c) 2025 by 尚博信_王强, All Rights Reserved. 
+ */
 import { registerRootComponent } from 'expo';
 
 import App from './App';

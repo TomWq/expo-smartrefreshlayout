@@ -40,8 +40,6 @@ class CustomRefreshHeader @JvmOverloads constructor(
         // 确保自定义视图本身也不拦截事件
         customView.isClickable = false
         customView.isFocusable = false
-        
-        android.util.Log.d("SmartRefresh", "CustomRefreshHeader 初始化完成")
     }
 
     override fun onInterceptTouchEvent(ev: MotionEvent?): Boolean {
@@ -68,7 +66,7 @@ class CustomRefreshHeader @JvmOverloads constructor(
     }
 
     override fun onInitialized(kernel: RefreshKernel, height: Int, maxDragHeight: Int) {
-        android.util.Log.d("SmartRefresh", "CustomRefreshHeader.onInitialized: height=$height, maxDragHeight=$maxDragHeight")
+        // 初始化完成
     }
 
     override fun onMoving(isDragging: Boolean, percent: Float, offset: Int, height: Int, maxDragHeight: Int) {
@@ -77,15 +75,14 @@ class CustomRefreshHeader @JvmOverloads constructor(
     }
 
     override fun onReleased(refreshLayout: RefreshLayout, height: Int, maxDragHeight: Int) {
-        android.util.Log.d("SmartRefresh", "CustomRefreshHeader.onReleased")
+        // 释放
     }
 
     override fun onStartAnimator(refreshLayout: RefreshLayout, height: Int, maxDragHeight: Int) {
-        android.util.Log.d("SmartRefresh", "CustomRefreshHeader.onStartAnimator")
+        // 开始动画
     }
 
     override fun onFinish(refreshLayout: RefreshLayout, success: Boolean): Int {
-        android.util.Log.d("SmartRefresh", "CustomRefreshHeader.onFinish: success=$success")
         return 0 // 返回 0 表示立即完成，不延迟
     }
 
@@ -96,7 +93,6 @@ class CustomRefreshHeader @JvmOverloads constructor(
     override fun isSupportHorizontalDrag(): Boolean = false
 
     override fun onStateChanged(refreshLayout: RefreshLayout, oldState: RefreshState, newState: RefreshState) {
-        android.util.Log.d("SmartRefresh", "CustomRefreshHeader.onStateChanged: $oldState -> $newState")
         // 可以根据状态变化更新自定义视图
     }
 

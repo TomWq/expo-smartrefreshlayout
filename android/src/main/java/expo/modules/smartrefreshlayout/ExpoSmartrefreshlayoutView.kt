@@ -6,6 +6,7 @@ import android.os.Handler
 import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
+import android.view.HapticFeedbackConstants
 import expo.modules.kotlin.AppContext
 import expo.modules.kotlin.viewevent.EventDispatcher
 import expo.modules.kotlin.views.ExpoView
@@ -71,8 +72,6 @@ class ExpoSmartrefreshlayoutView(context: Context, appContext: AppContext) : Exp
         setHeaderTriggerRate(1.0f)
         setFooterTriggerRate(1.0f)
         setReboundDuration(300)
-        
-        android.util.Log.d("SmartRefresh", "默认配置已应用")
     }
 
     init {
@@ -85,8 +84,6 @@ class ExpoSmartrefreshlayoutView(context: Context, appContext: AppContext) : Exp
         
         // 安装事件监听器
         installListeners()
-        
-        android.util.Log.d("SmartRefresh", "ExpoSmartrefreshlayoutView 初始化完成")
     }
 
     // 自定义 Header/Footer 标志
@@ -95,12 +92,16 @@ class ExpoSmartrefreshlayoutView(context: Context, appContext: AppContext) : Exp
     private var customHeaderSet = false
     private var customFooterSet = false
     
+    // 触觉反馈相关
+    private var enableHapticFeedback = true
+    private var hasTriggeredRefreshHaptic = false
+    private var hasTriggeredLoadMoreHaptic = false
+    
     // -----------------------
     // View 管理
     // -----------------------
     
     override fun addView(child: View?) {
-        android.util.Log.d("SmartRefresh", "addView: ${child?.javaClass?.simpleName}")
         if (child == null) return
         
         if (child == srl) {
@@ -108,11 +109,9 @@ class ExpoSmartrefreshlayoutView(context: Context, appContext: AppContext) : Exp
                 LayoutParams.MATCH_PARENT,
                 LayoutParams.MATCH_PARENT
             ))
-            android.util.Log.d("SmartRefresh", "SmartRefreshLayout 已添加到 ExpoView")
         } else {
             // 如果启用了自定义 Header 且还没设置过，第一个子视图就是 Header
             if (hasCustomHeader && !customHeaderSet) {
-                android.util.Log.d("SmartRefresh", "检测到自定义 Header")
                 setCustomHeader(child)
                 customHeaderSet = true
                 return
@@ -123,12 +122,10 @@ class ExpoSmartrefreshlayoutView(context: Context, appContext: AppContext) : Exp
                 LayoutParams.MATCH_PARENT,
                 LayoutParams.MATCH_PARENT
             ))
-            android.util.Log.d("SmartRefresh", "子组件已添加到 SmartRefreshLayout, 子组件数量: ${srl.childCount}")
         }
     }
 
     override fun addView(child: View?, index: Int) {
-        android.util.Log.d("SmartRefresh", "addView with index: ${child?.javaClass?.simpleName}, index=$index, hasCustomHeader=$hasCustomHeader, customHeaderSet=$customHeaderSet, hasCustomFooter=$hasCustomFooter, customFooterSet=$customFooterSet")
         if (child == null) return
         
         if (child == srl) {
@@ -136,7 +133,6 @@ class ExpoSmartrefreshlayoutView(context: Context, appContext: AppContext) : Exp
         } else {
             // 如果启用了自定义 Header 且还没设置过，第一个子视图就是 Header
             if (hasCustomHeader && !customHeaderSet) {
-                android.util.Log.d("SmartRefresh", "检测到自定义 Header（通过 addView with index）")
                 setCustomHeader(child)
                 customHeaderSet = true
                 return
@@ -146,19 +142,16 @@ class ExpoSmartrefreshlayoutView(context: Context, appContext: AppContext) : Exp
             // 由于无法提前知道哪个是最后一个子视图，我们需要在布局时处理
             // 这里先正常添加
             srl.addView(child, index)
-            android.util.Log.d("SmartRefresh", "子组件已添加到 SmartRefreshLayout (带index), 子组件数量: ${srl.childCount}")
         }
     }
 
     override fun addView(child: View?, params: ViewGroup.LayoutParams?) {
-        android.util.Log.d("SmartRefresh", "addView with params: ${child?.javaClass?.simpleName}")
         if (child == null) return
         
         if (child == srl) {
             super.addView(child, params)
         } else {
             srl.addView(child, params)
-            android.util.Log.d("SmartRefresh", "子组件已添加到 SmartRefreshLayout (带params), 子组件数量: ${srl.childCount}")
         }
     }
 
@@ -184,24 +177,20 @@ class ExpoSmartrefreshlayoutView(context: Context, appContext: AppContext) : Exp
     private fun installListeners() {
         srl.setOnMultiListener(object : OnMultiListener {
             override fun onRefresh(refreshLayout: com.scwang.smart.refresh.layout.api.RefreshLayout) {
-                android.util.Log.d("SmartRefresh", "onRefresh 触发")
                 onRefresh(mapOf())
                 
                 mainHandler.postDelayed({
                     if (srl.state == NativeRefreshState.Refreshing) {
-                        android.util.Log.d("SmartRefresh", "自动结束刷新")
                         srl.finishRefresh(true)
                     }
                 }, 3000)
             }
 
             override fun onLoadMore(refreshLayout: com.scwang.smart.refresh.layout.api.RefreshLayout) {
-                android.util.Log.d("SmartRefresh", "onLoadMore 触发")
                 onLoadMore(mapOf())
                 
                 mainHandler.postDelayed({
                     if (srl.state == NativeRefreshState.Loading) {
-                        android.util.Log.d("SmartRefresh", "自动结束加载")
                         srl.finishLoadMore(true)
                     }
                 }, 3000)
@@ -215,6 +204,14 @@ class ExpoSmartrefreshlayoutView(context: Context, appContext: AppContext) : Exp
                 headerHeight: Int,
                 maxDragHeight: Int
             ) {
+                // 触觉反馈：当下拉超过触发阈值时（percent >= 1.0），触发震动
+                if (enableHapticFeedback && isDragging && percent >= 1.0f && !hasTriggeredRefreshHaptic) {
+                    performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+                    hasTriggeredRefreshHaptic = true
+                } else if (percent < 1.0f) {
+                    hasTriggeredRefreshHaptic = false
+                }
+                
                 // 将物理像素转换回逻辑像素（dp），与 iOS 保持一致
                 val density = resources.displayMetrics.density
                 val offsetDp = (offset / density).toInt()
@@ -238,6 +235,14 @@ class ExpoSmartrefreshlayoutView(context: Context, appContext: AppContext) : Exp
                 footerHeight: Int,
                 maxDragHeight: Int
             ) {
+                // 触觉反馈：当上拉超过触发阈值时（percent >= 1.0），触发震动
+                if (enableHapticFeedback && isDragging && percent >= 1.0f && !hasTriggeredLoadMoreHaptic) {
+                    performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+                    hasTriggeredLoadMoreHaptic = true
+                } else if (percent < 1.0f) {
+                    hasTriggeredLoadMoreHaptic = false
+                }
+                
                 onFooterMoving(
                     mapOf(
                         "isDragging" to isDragging,
@@ -254,7 +259,6 @@ class ExpoSmartrefreshlayoutView(context: Context, appContext: AppContext) : Exp
                 oldState: NativeRefreshState,
                 newState: NativeRefreshState
             ) {
-                android.util.Log.d("SmartRefresh", "状态变化: ${StateMapper.nativeStateToString(oldState)} -> ${StateMapper.nativeStateToString(newState)}")
                 val refreshStateValue = StateMapper.nativeStateToRefreshState(newState)
                 onStateChanged(mapOf("state" to refreshStateValue))
             }
@@ -392,7 +396,6 @@ class ExpoSmartrefreshlayoutView(context: Context, appContext: AppContext) : Exp
      * 设置是否使用自定义 Header
      */
     fun setHasCustomHeader(value: Boolean) {
-        android.util.Log.d("SmartRefresh", "setHasCustomHeader: $value")
         hasCustomHeader = value
         customHeaderSet = false  // 重置标志，允许重新设置
     }
@@ -401,9 +404,15 @@ class ExpoSmartrefreshlayoutView(context: Context, appContext: AppContext) : Exp
      * 设置是否使用自定义 Footer
      */
     fun setHasCustomFooter(value: Boolean) {
-        android.util.Log.d("SmartRefresh", "setHasCustomFooter: $value")
         hasCustomFooter = value
         customFooterSet = false  // 重置标志，允许重新设置
+    }
+    
+    /**
+     * 设置是否启用触觉反馈
+     */
+    fun setEnableHapticFeedback(value: Boolean) {
+        enableHapticFeedback = value
     }
 
     // -----------------------
@@ -440,15 +449,11 @@ class ExpoSmartrefreshlayoutView(context: Context, appContext: AppContext) : Exp
      */
     private fun setCustomHeader(view: View) {
         try {
-            android.util.Log.d("SmartRefresh", "设置自定义 Header")
-            
             // 创建一个包装 Header，实现 RefreshHeader 接口
             val customHeader = CustomRefreshHeader(context, view)
             srl.setRefreshHeader(customHeader)
-            
-            android.util.Log.d("SmartRefresh", "自定义 Header 设置成功")
-        } catch (e: Exception) {
-            android.util.Log.e("SmartRefresh", "设置自定义 Header 失败", e)
+        } catch (_: Exception) {
+            // 静默处理异常
         }
     }
     
@@ -457,15 +462,11 @@ class ExpoSmartrefreshlayoutView(context: Context, appContext: AppContext) : Exp
      */
     private fun setCustomFooter(view: View) {
         try {
-            android.util.Log.d("SmartRefresh", "设置自定义 Footer")
-            
             // 创建一个包装 Footer，实现 RefreshFooter 接口
             val customFooter = CustomRefreshFooter(context, view)
             srl.setRefreshFooter(customFooter)
-            
-            android.util.Log.d("SmartRefresh", "自定义 Footer 设置成功")
-        } catch (e: Exception) {
-            android.util.Log.e("SmartRefresh", "设置自定义 Footer 失败", e)
+        } catch (_: Exception) {
+            // 静默处理异常
         }
     }
     
