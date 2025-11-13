@@ -40,7 +40,7 @@ class ExpoSmartrefreshlayoutView: ExpoView, UIScrollViewDelegate {
     
     // ========== 配置属性 ==========
     private var enableRefreshValue: Bool = true
-    private var enableLoadMoreValue: Bool = true
+    private var enableLoadMoreValue: Bool = false  // 默认关闭，避免与 FlatList 的 onEndReached 冲突
     private var enableAutoLoadMoreValue: Bool = false
     private var headerTypeValue: String = "classics"
     

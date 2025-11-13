@@ -2,7 +2,7 @@
  * @Author       : 尚博信_王强 wangqiang03@sunboxsoft.com
  * @Date         : 2025-11-12 10:14:48
  * @LastEditors  : 尚博信_王强 wangqiang03@sunboxsoft.com
- * @LastEditTime : 2025-11-13 11:15:38
+ * @LastEditTime : 2025-11-13 13:59:28
  * @FilePath     : /expo-smartrefreshlayout/example/App.tsx
  * @Description  : 
  * 
@@ -50,7 +50,7 @@ const [headerOffset, setHeaderOffset] = useState(0);
 
   const onHeaderMoving = (params: onHeaderMoveProps) => {
     setHeaderOffset(params.offset);
-    console.log('Header 移动:', params);
+   
   }
 
   const onFooterMoving = useCallback((params: any) => {
@@ -104,36 +104,36 @@ const [headerOffset, setHeaderOffset] = useState(0);
         //     </View>
         //   )}
           
-        headerType="material"
-        classicRefreshHeaderProps={{
-          // 文字定制
-          REFRESH_HEADER_PULLING: '下拉刷新',
-          REFRESH_HEADER_RELEASE: '释放刷新',
-          REFRESH_HEADER_REFRESHING: '加载中...',
-          REFRESH_HEADER_FINISH: '刷新完成啦',
+        // headerType="material"
+        // classicRefreshHeaderProps={{
+        //   // 文字定制
+        //   REFRESH_HEADER_PULLING: '下拉刷新',
+        //   REFRESH_HEADER_RELEASE: '释放刷新',
+        //   REFRESH_HEADER_REFRESHING: '加载中...',
+        //   REFRESH_HEADER_FINISH: '刷新完成啦',
 
-          // 样式定制
-          headerAccentColor: '#FF5722',
-          headerPrimaryColor: '#ffffff',
-          headerTitleTextSize: 14,
-          headerFinishDuration: 300,
-          headerDrawableArrowSize: 14,
-          headerDrawableProgressSize: 24,
+        //   // 样式定制
+        //   headerAccentColor: '#FF5722',
+        //   headerPrimaryColor: '#ffffff',
+        //   headerTitleTextSize: 14,
+        //   headerFinishDuration: 300,
+        //   headerDrawableArrowSize: 14,
+        //   headerDrawableProgressSize: 24,
 
-        }}
-        classicLoadMoreFooterProps={{
-          // Footer 定制
-          REFRESH_FOOTER_PULLING: '上拉加载',
-          REFRESH_FOOTER_LOADING: '加载中...',
-          REFRESH_FOOTER_RELEASE: '释放加载更多',
-          REFRESH_FOOTER_NOTHING: '没有更多数据了',
+        // }}
+        // classicLoadMoreFooterProps={{
+        //   // Footer 定制
+        //   REFRESH_FOOTER_PULLING: '上拉加载',
+        //   REFRESH_FOOTER_LOADING: '加载中...',
+        //   REFRESH_FOOTER_RELEASE: '释放加载更多',
+        //   REFRESH_FOOTER_NOTHING: '没有更多数据了',
 
-          footerAccentColor: '#4CAF50',
-          footerTitleTextSize: 14,
-          footerDrawableArrowSize: 14,
+        //   footerAccentColor: '#4CAF50',
+        //   footerTitleTextSize: 14,
+        //   footerDrawableArrowSize: 14,
 
-          footerFinishDuration: 0
-        }}
+        //   footerFinishDuration: 0
+        // }}
         onHeaderMoving={onHeaderMoving}
         onRefresh={handleRefresh}
         onStateChanged={handleStateChanged}
@@ -146,7 +146,7 @@ const [headerOffset, setHeaderOffset] = useState(0);
           keyExtractor={(item, index) => index.toString()}
           style={styles.list}
           contentContainerStyle={styles.listContent}
-
+         
         />
 
       </ExpoSmartrefreshlayoutView>

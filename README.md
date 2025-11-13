@@ -174,7 +174,7 @@ function App() {
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `enableRefresh` | `boolean` | `true` | 是否启用下拉刷新功能 |
-| `enableLoadMore` | `boolean` | `true` | 是否启用上拉加载功能 |
+| `enableLoadMore` | `boolean` | `false` | 是否启用上拉加载功能（默认关闭，避免与 FlatList 的 onEndReached 冲突） |
 | `enableAutoLoadMore` | `boolean` | `false` | 是否启用列表惯性滑动到底部时自动加载更多 |
 | `enablePureScrollMode` | `boolean` | `false` | 是否启用纯滚动模式（Android 专属） |
 | `renderHeader` | `() => React.ReactElement` | - | 自定义 Header 组件渲染函数，提供后将自动使用自定义 Header |
@@ -469,6 +469,110 @@ ExpoSmartrefreshlayoutModule.setNoMoreData(false);
 - `noMoreData` (boolean): 是否没有更多数据
 
 ## 🎨 高级用法
+
+### 加载更多功能说明
+
+#### 为什么默认关闭 enableLoadMore？
+
+在 React Native 中，`FlatList` 组件自带 `onEndReached` 属性用于处理加载更多场景，这是最常用且轻量的方案。为了避免功能冲突和给开发者更好的灵活性，`enableLoadMore` 默认设置为 `false`。
+
+#### 使用场景选择
+
+**场景 1：只需要下拉刷新（推荐，最常见）**
+
+使用 FlatList 自带的 `onEndReached` 处理加载更多：
+
+```tsx
+import { ExpoSmartrefreshlayoutView, ExpoSmartrefreshlayoutModule } from 'expo-smartrefreshlayout';
+import { FlatList } from 'react-native';
+
+function App() {
+  const [data, setData] = useState([1, 2, 3, 4, 5]);
+
+  const handleRefresh = async () => {
+    await fetchData();
+    ExpoSmartrefreshlayoutModule.finishRefresh(true, 300);
+  };
+
+  const handleEndReached = () => {
+    // 使用 FlatList 自带的加载更多
+    loadMoreData();
+  };
+
+  return (
+    <ExpoSmartrefreshlayoutView onRefresh={handleRefresh}>
+      <FlatList
+        data={data}
+        onEndReached={handleEndReached}
+        onEndReachedThreshold={0.1}
+        renderItem={({ item }) => <Item data={item} />}
+      />
+    </ExpoSmartrefreshlayoutView>
+  );
+}
+```
+
+**场景 2：需要统一的刷新和加载更多 UI**
+
+显式启用 `enableLoadMore`，使用组件提供的加载更多功能：
+
+```tsx
+import { ExpoSmartrefreshlayoutView, ExpoSmartrefreshlayoutModule } from 'expo-smartrefreshlayout';
+import { FlatList } from 'react-native';
+
+function App() {
+  const [data, setData] = useState([1, 2, 3, 4, 5]);
+
+  const handleRefresh = async () => {
+    await fetchData();
+    ExpoSmartrefreshlayoutModule.finishRefresh(true, 300);
+  };
+
+  const handleLoadMore = async () => {
+    const newData = await loadMoreData();
+    
+    if (newData.length === 0) {
+      // 没有更多数据
+      ExpoSmartrefreshlayoutModule.finishLoadMore(true, 0, true);
+    } else {
+      setData([...data, ...newData]);
+      ExpoSmartrefreshlayoutModule.finishLoadMore(true, 300);
+    }
+  };
+
+  return (
+    <ExpoSmartrefreshlayoutView
+      enableLoadMore={true}  // 显式启用
+      onRefresh={handleRefresh}
+      onLoadMore={handleLoadMore}
+      classicLoadMoreFooterProps={{
+        footerAccentColor: '#007AFF',
+        REFRESH_FOOTER_PULLING: '上拉加载更多',
+        REFRESH_FOOTER_LOADING: '正在加载...',
+        REFRESH_FOOTER_NOTHING: '没有更多了',
+      }}
+    >
+      <FlatList
+        data={data}
+        renderItem={({ item }) => <Item data={item} />}
+      />
+    </ExpoSmartrefreshlayoutView>
+  );
+}
+```
+
+#### 优缺点对比
+
+| 方案 | 优点 | 缺点 |
+|------|------|------|
+| **FlatList onEndReached** | • 轻量级，性能好<br>• RN 原生支持<br>• 开发者熟悉 | • 无加载动画<br>• 需要自行实现 loading 状态 |
+| **组件 enableLoadMore** | • 统一的 UI 风格<br>• 内置加载动画<br>• 丰富的自定义选项 | • 略微增加复杂度<br>• 需要显式启用 |
+
+#### 推荐做法
+
+- ✅ **大多数情况**：使用 FlatList 的 `onEndReached`，简单高效
+- ✅ **需要统一 UI**：启用 `enableLoadMore={true}`，获得一致的用户体验
+- ✅ **避免同时使用**：不要同时使用 `onEndReached` 和 `enableLoadMore`，会导致重复触发
 
 ### 自定义 Header
 

@@ -245,7 +245,9 @@ export type ExpoSmartrefreshlayoutViewProps = {
 
   /**
    * 是否启用上拉加载功能
-   * @default true
+   * @default false
+   * @description 默认关闭以避免与 FlatList 的 onEndReached 冲突。
+   * 如需使用组件提供的加载更多功能，请显式设置为 true。
    */
   enableLoadMore?: boolean
 

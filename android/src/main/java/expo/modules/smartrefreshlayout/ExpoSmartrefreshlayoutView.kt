@@ -56,7 +56,7 @@ class ExpoSmartrefreshlayoutView(context: Context, appContext: AppContext) : Exp
         // ========== 设置合理的默认值 ==========
         setDragRate(0.5f)  // 阻尼系数：显示高度/手指滑动距离（官方默认 0.5）
         setEnableRefresh(true)
-        setEnableLoadMore(true)
+        setEnableLoadMore(false)  // 默认关闭，避免与 FlatList 的 onEndReached 冲突
         setEnablePureScrollMode(false)
         setEnableScrollContentWhenRefreshed(true)
         setEnableScrollContentWhenLoaded(true)
