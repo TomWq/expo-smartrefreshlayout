@@ -1,8 +1,10 @@
 # expo-smartrefreshlayout
 
-一个功能强大的 React Native 下拉刷新和上拉加载组件，基于原生实现：
+一个功能强大的 React Native 下拉刷新和上拉加载组件，**基于 Expo Modules 开发**，使用原生库实现：
 - Android: [SmartRefreshLayout](https://github.com/scwang90/SmartRefreshLayout)
 - iOS: [MJRefresh](https://github.com/CoderMJLee/MJRefresh)
+
+> 💡 本组件使用 [Expo Modules API](https://docs.expo.dev/modules/overview/) 构建，提供了类型安全的原生模块接口和优秀的开发体验。
 
 ## ✨ 特性
 
@@ -26,6 +28,31 @@ npm install expo-smartrefreshlayout
 yarn add expo-smartrefreshlayout
 # 或
 pnpm add expo-smartrefreshlayout
+```
+
+### Expo 项目
+
+如果你使用的是 Expo 管理的项目（使用 `expo prebuild` 或开发构建），安装后需要重新构建原生代码：
+
+```bash
+# 使用 EAS Build
+eas build --platform all
+
+# 或使用本地构建
+npx expo prebuild
+npx expo run:android
+npx expo run:ios
+```
+
+### 纯 React Native 项目
+
+对于纯 React Native 项目（通过 `react-native init` 创建），确保已安装 `expo` 包作为依赖：
+
+```bash
+npm install expo
+# 然后重新构建应用
+npx react-native run-android
+npx react-native run-ios
 ```
 
 ## 🚀 快速开始
@@ -144,7 +171,7 @@ function App() {
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `headerType` | `'classics' \| 'material'` | `'classics'` | Header 类型 |
+| `headerType` | `'classics' \| 'material' \| string` | `'classics'` | Header 类型（classics: 经典样式，material: Material Design 样式） |
 | `headerHeight` | `number` | `60` | Header 标准高度（dp/pt） |
 | `footerHeight` | `number` | `60` | Footer 标准高度（dp/pt） |
 | `headerInsetStart` | `number` | `0` | Header 起始位置偏移量（Android 专属） |
@@ -154,9 +181,9 @@ function App() {
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `dragRate` | `number` | `0.5` | 阻尼系数：显示高度/手指滑动距离（Android 专属） |
-| `headerMaxDragRate` | `number` | `2.0` | Header 最大拖拽距离 / Header 标准高度（Android 专属） |
-| `footerMaxDragRate` | `number` | `2.0` | Footer 最大拖拽距离 / Footer 标准高度（Android 专属） |
+| `dragRate` | `number` | `1.0` | Header 拖动比率（Android 专属） |
+| `headerMaxDragRate` | `number` | `100` | Header 最大拖拽距离 / Header 标准高度（Android 专属） |
+| `footerMaxDragRate` | `number` | `1.0` | Footer 最大拖拽距离 / Footer 标准高度（Android 专属） |
 | `headerTriggerRate` | `number` | `1.0` | 刷新触发比率（Android 专属） |
 | `footerTriggerRate` | `number` | `1.0` | 加载更多触发比率（Android 专属） |
 | `reboundDuration` | `number` | `300` | 回弹动画时长（毫秒，Android 专属） |
@@ -185,21 +212,40 @@ function App() {
 
 ```tsx
 classicRefreshHeaderProps={{
+  // 颜色配置
   headerAccentColor: '#007AFF',        // 强调颜色
-  headerPrimaryColor: '#FFFFFF',       // 主题颜色（背景色）
+  headerPrimaryColor: '#FFFFFF',       // 主题颜色（背景色，Android 专属）
+  
+  // 文字大小配置
   headerTitleTextSize: 16,             // 标题文字大小（sp）
   headerTimeTextSize: 12,              // 时间文字大小（sp）
-  headerShowTime: true,                // 是否显示时间
-  headerFinishDuration: 500,           // 刷新完成停留时间（毫秒）
-  headerDrawableSize: 20,              // 图标大小（dp）
-  headerDrawableMarginRight: 10,       // 图标与文字间距（dp）
-  headerLastUpdateText: '上次更新时间', // 手动设置时间文字
+  headerTimePaddingTop: 0,             // 时间标签上边距（dp，Android 专属）
   
-  // 状态文字（iOS & Android）
+  // 显示配置
+  headerShowTime: true,                // 是否显示时间
+  headerFinishDuration: 500,           // 刷新完成停留时间（毫秒，Android 专属）
+  
+  // 图标配置
+  headerDrawableSize: 20,              // 同时设置箭头和图片大小（dp，Android 专属）
+  headerDrawableArrowSize: 20,         // 箭头大小（dp，Android 专属）
+  headerDrawableProgressSize: 20,      // 进度图标大小（dp，Android 专属）
+  headerDrawableMarginRight: 10,       // 图标与文字间距（dp，Android 专属）
+  headerDrawableArrow: '',             // 自定义箭头图片（Android 专属）
+  headerDrawableProgress: '',          // 自定义进度图片（Android 专属）
+  
+  // 时间配置
+  headerTimeFormat: 'M-d HH:mm',       // 时间格式化（Android 专属）
+  headerLastUpdateText: '上次更新时间', // 手动设置时间文字（不会自动更新）
+  
+  // 状态文字
   REFRESH_HEADER_PULLING: '下拉刷新',
   REFRESH_HEADER_RELEASE: '释放刷新',
   REFRESH_HEADER_REFRESHING: '正在刷新...',
+  REFRESH_HEADER_LOADING: '正在加载...',      // Android 专属
   REFRESH_HEADER_FINISH: '刷新完成',
+  REFRESH_HEADER_FAILED: '刷新失败',          // Android 专属
+  REFRESH_HEADER_SECONDARY: '释放进入二楼',    // Android 专属（二楼功能）
+  REFRESH_HEADER_UPDATE: '上次更新 M-d HH:mm', // Android 专属
 }}
 ```
 
@@ -207,18 +253,30 @@ classicRefreshHeaderProps={{
 
 ```tsx
 classicLoadMoreFooterProps={{
+  // 颜色配置
   footerAccentColor: '#007AFF',        // 强调颜色
-  footerPrimaryColor: '#FFFFFF',       // 主题颜色（背景色）
-  footerTitleTextSize: 14,             // 标题文字大小（sp）
-  footerFinishDuration: 500,           // 加载完成停留时间（毫秒）
-  footerDrawableSize: 20,              // 图标大小（dp）
-  footerDrawableMarginRight: 10,       // 图标与文字间距（dp）
+  footerPrimaryColor: '#FFFFFF',       // 主题颜色（背景色，Android 专属）
   
-  // 状态文字（iOS & Android）
+  // 文字大小配置
+  footerTitleTextSize: 14,             // 标题文字大小（sp）
+  
+  // 图标配置
+  footerDrawableSize: 20,              // 同时设置箭头和图片大小（dp，Android 专属）
+  footerDrawableArrowSize: 20,         // 箭头大小（dp，Android 专属）
+  footerDrawableProgressSize: 20,      // 进度图标大小（dp，Android 专属）
+  footerDrawableMarginRight: 10,       // 图标与文字间距（dp，Android 专属）
+  footerDrawableArrow: '',             // 自定义箭头图片（Android 专属）
+  
+  // 显示配置
+  footerFinishDuration: 1000,          // 加载完成停留时间（毫秒，默认 1000，Android 专属）
+  
+  // 状态文字
   REFRESH_FOOTER_PULLING: '上拉加载更多',
-  REFRESH_FOOTER_RELEASE: '释放加载',
+  REFRESH_FOOTER_RELEASE: '释放加载',        // Android 专属
   REFRESH_FOOTER_LOADING: '正在加载...',
-  REFRESH_FOOTER_FINISH: '加载完成',
+  REFRESH_FOOTER_REFRESHING: '正在加载...',  // Android 专属
+  REFRESH_FOOTER_FINISH: '加载完成',         // Android 专属
+  REFRESH_FOOTER_FAILED: '加载失败',
   REFRESH_FOOTER_NOTHING: '没有更多数据',
 }}
 ```
@@ -506,7 +564,6 @@ function AnimatedCustomHeader() {
   
   return (
     <ExpoSmartrefreshlayoutView
-      headerHeight={80}
       renderHeader={() => (
         // 自定义动画 Header
         <View style={{ 
@@ -740,12 +797,6 @@ const styles = StyleSheet.create({
 });
 ```
 
-## 📝 注意事项
-
-1. **Android 自动结束刷新**：在 Android 平台，如果 3 秒后没有调用 `finishRefresh`，系统会自动结束刷新状态
-2. **iOS 需要手动调用**：在 iOS 平台，必须手动调用 `finishRefresh` 或 `finishLoadMore` 来结束刷新/加载状态
-3. **状态管理**：建议使用 `onStateChanged` 回调来管理 UI 状态，而不是手动维护状态变量
-4. **自定义 Header**：使用自定义 Header 时，建议设置 `headerHeight` 属性以确保触发高度正确
 
 ## 🤝 贡献
 
