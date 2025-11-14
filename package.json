@@ -1,6 +1,6 @@
 {
   "name": "expo-smartrefreshlayout",
-  "version": "0.1.2",
+  "version": "0.1.4",
   "description": "一个功能强大的 React Native 下拉刷新和上拉加载组件，基于 Expo Modules 开发，使用原生库实现（Android: SmartRefreshLayout, iOS: MJRefresh）",
   "main": "build/index.js",
   "types": "build/index.d.ts",
@@ -13,6 +13,7 @@
     "prepublishOnly": "expo-module prepublishOnly",
     "expo-module": "expo-module",
     "open:ios": "xed example/ios",
+    "npm:publish": "npm publish",
     "open:android": "open -a \"Android Studio\" example/android"
   },
   "keywords": [
