@@ -68,6 +68,31 @@ class ExpoSmartrefreshlayoutView: ExpoView, UIScrollViewDelegate {
         clipsToBounds = true
     }
     
+    deinit {
+        // 清理工作，防止内存泄漏
+        cleanup()
+    }
+    
+    /**
+     * 清理资源
+     */
+    private func cleanup() {
+        // 移除 ScrollView 的 delegate
+        scrollView?.delegate = nil
+        
+        // 停止所有刷新动画
+        scrollView?.mj_header?.endRefreshing()
+        scrollView?.mj_footer?.endRefreshing()
+        
+        // 移除 Header 和 Footer
+        scrollView?.mj_header = nil
+        scrollView?.mj_footer = nil
+        
+        // 清空引用
+        scrollView = nil
+        customHeaderView = nil
+    }
+    
     // ===========================================================================
     // 子视图管理
     // ===========================================================================

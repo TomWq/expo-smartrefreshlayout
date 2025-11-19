@@ -2,14 +2,14 @@
  * @Author       : 尚博信_王强 wangqiang03@sunboxsoft.com
  * @Date         : 2025-11-12 10:14:48
  * @LastEditors  : 尚博信_王强 wangqiang03@sunboxsoft.com
- * @LastEditTime : 2025-11-13 11:10:16
+ * @LastEditTime : 2025-11-19 14:04:48
  * @FilePath     : /expo-smartrefreshlayout/src/ExpoSmartrefreshlayout.types.ts
  * @Description  : 
  * 
  * Copyright (c) 2025 by 尚博信_王强, All Rights Reserved. 
  */
 
-import { StyleProp, ViewStyle } from "react-native";
+import { StyleProp, ViewProps, ViewStyle } from "react-native";
 
 
 //经典刷新头的属性接口
@@ -220,11 +220,66 @@ export interface ClassicLoadMoreFooterProps {
 }
 
 export type onHeaderMoveProps = {
-  isDragging: boolean; 
-  percent: number; 
-  offset: number; 
+  isDragging: boolean;
+  percent: number;
+  offset: number;
   headerHeight: number
 }
+
+/**
+ * renderHeader 回调函数的参数
+ */
+export type RenderHeaderParams = {
+  /**
+   * 当前刷新状态
+   */
+  state: RefreshState;
+  
+  /**
+   * Header 移动参数（实时更新）
+   */
+  moving: onHeaderMoveProps;
+  
+  /**
+   * 是否正在刷新
+   */
+  refreshing: boolean;
+}
+
+/**
+ * 原生视图的 Props 类型（内部使用）
+ * 原生层传递的事件是包装在 nativeEvent 中的
+ */
+export type NativeViewProps = Omit<ExpoSmartrefreshlayoutViewProps, 'onStateChanged' | 'onHeaderMoving' | 'onFooterMoving' | 'renderHeader' | 'renderFooter'> & {
+  /**
+   * 状态改变回调（原生事件格式）
+   */
+  onStateChanged?: (event: { nativeEvent: { state: RefreshState } }) => void;
+  /**
+   * Header 移动回调（原生事件格式）
+   */
+  onHeaderMoving?: (event: { nativeEvent: onHeaderMoveProps }) => void;
+  /**
+   * Footer 移动回调（原生事件格式）
+   */
+  onFooterMoving?: (event: { nativeEvent: onHeaderMoveProps }) => void;
+  /**
+   * 自定义 Header（原生层格式）
+   */
+  renderHeader?: () => React.ReactNode;
+  /**
+   * 自定义 Footer（原生层格式）
+   */
+  renderFooter?: () => React.ReactNode;
+  /**
+   * 是否有自定义 Header
+   */
+  hasCustomHeader?: boolean;
+  /**
+   * 是否有自定义 Footer
+   */
+  hasCustomFooter?: boolean;
+};
 
 export type ExpoSmartrefreshlayoutViewProps = {
 
@@ -234,8 +289,9 @@ export type ExpoSmartrefreshlayoutViewProps = {
 
   /**
    * 自定义下拉刷新头部
+   * @param params - 包含 state（状态）、moving（移动参数）、refreshing（是否刷新中）
    */
-  renderHeader?: () => React.ReactNode
+  renderHeader?: (params: RenderHeaderParams) => React.ReactNode
 
   /**
    * 是否启用下拉刷新功能
@@ -503,6 +559,18 @@ export type ExpoSmartrefreshlayoutModuleEvents  = {
  */
   setNoMoreData:(noMoreData: boolean)=> void
 
+}
+
+export interface DefaultRefreshHeaderProps extends ViewProps {
+  /**
+   * renderHeader 回调参数
+   */
+  params: RenderHeaderParams;
+  
+  /**
+   * 文字颜色
+   */
+  textColor?: string;
 }
 
 /**

@@ -485,17 +485,47 @@ class ExpoSmartrefreshlayoutView(context: Context, appContext: AppContext) : Exp
     
     /**
      * 视图从窗口分离时的清理工作
-     * 
+     *
      * 移除所有监听器和回调，防止内存泄漏
      */
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
+        cleanup()
+    }
+    
+    /**
+     * 清理资源，防止内存泄漏
+     */
+    private fun cleanup() {
         try {
+            // 停止所有刷新动画
+            if (srl.state == NativeRefreshState.Refreshing) {
+                srl.finishRefresh(0, true, false)
+            }
+            if (srl.state == NativeRefreshState.Loading) {
+                srl.finishLoadMore(0, true, false)
+            }
+            
+            // 移除所有监听器
             srl.setOnRefreshListener(null)
             srl.setOnLoadMoreListener(null)
             srl.setOnMultiListener(null)
+            
+            // 清空 Header 和 Footer
+            srl.setRefreshHeader(null)
+            srl.setRefreshFooter(null)
+            
+            // 移除所有子视图
             srl.removeAllViews()
-        } catch (_: Throwable) {}
-        mainHandler.removeCallbacksAndMessages(null)
+            
+            // 清空自定义视图引用
+            customHeaderView = null
+            
+            // 清空 Handler 的所有消息和回调
+            mainHandler.removeCallbacksAndMessages(null)
+        } catch (e: Throwable) {
+            // 静默处理异常，避免崩溃
+            e.printStackTrace()
+        }
     }
 }

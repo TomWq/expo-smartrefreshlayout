@@ -126,6 +126,7 @@ function App() {
 ## 📖 文档
 
 - **[API 文档](./docs/API.md)** - 完整的 Props、方法和类型定义
+- **[自定义 Header 文档](./docs/CUSTOM_HEADER.md)** - 自定义下拉刷新 Header 的完整指南
 - **[示例代码](./docs/EXAMPLES.md)** - 丰富的使用示例和最佳实践
 
 ## 🏗️ 架构支持
@@ -145,7 +146,7 @@ function App() {
 | `enableRefresh` | `boolean` | `true` | 是否启用下拉刷新 |
 | `enableLoadMore` | `boolean` | `false` | 是否启用上拉加载 |
 | `headerType` | `'classics' \| 'material'` | `'classics'` | Header 类型 |
-| `renderHeader` | `() => React.ReactElement` | - | 自定义 Header 组件 |
+| `renderHeader` | `(params: RenderHeaderParams) => React.ReactNode` | - | 自定义 Header 组件，接收状态参数 |
 | `onRefresh` | `() => void` | - | 下拉刷新回调 |
 | `onLoadMore` | `() => void` | - | 上拉加载回调 |
 
@@ -200,9 +201,6 @@ ExpoSmartrefreshlayoutModule.setNoMoreData(noMoreData: boolean);
 </ExpoSmartrefreshlayoutView>
 ```
 
-## 🤝 贡献
-
-欢迎提交 Issue 和 Pull Request！
 
 ## 📄 许可证
 
@@ -211,6 +209,17 @@ MIT
 ## 🔗 相关链接
 
 - [API 文档](./docs/API.md)
+- [自定义 Header 文档](./docs/CUSTOM_HEADER.md)
 - [示例代码](./docs/EXAMPLES.md)
 - [SmartRefreshLayout (Android)](https://github.com/scwang90/SmartRefreshLayout)
 - [MJRefresh (iOS)](https://github.com/CoderMJLee/MJRefresh)
+
+
+## 📮 反馈与支持
+
+如果你在使用过程中遇到问题或有任何建议，欢迎：
+
+- 📝 提交 [GitHub Issue](https://github.com/TomWq/expo-smartrefreshlayout/issues)
+- 💬 参与 [Discussions](https://github.com/TomWq/expo-smartrefreshlayout/discussions)
+- ⭐ 给项目点个 Star 支持一下
+- 💬 加入 QQ 群：952241387 

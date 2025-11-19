@@ -10,7 +10,7 @@
 | `enableLoadMore` | `boolean` | `false` | 是否启用上拉加载功能（默认关闭，避免与 FlatList 的 onEndReached 冲突） |
 | `enableAutoLoadMore` | `boolean` | `false` | 是否启用列表惯性滑动到底部时自动加载更多 |
 | `enablePureScrollMode` | `boolean` | `false` | 是否启用纯滚动模式（Android 专属） |
-| `renderHeader` | `() => React.ReactElement` | - | 自定义 Header 组件渲染函数，提供后将自动使用自定义 Header |
+| `renderHeader` | `(params: RenderHeaderParams) => React.ReactNode` | - | 自定义 Header 组件渲染函数，接收包含状态的参数对象。详见 [自定义 Header 文档](./CUSTOM_HEADER.md) |
 | `renderFooter` | `() => React.ReactElement` | - | 自定义 Footer 组件渲染函数，提供后将自动使用自定义 Footer |
 
 ### 样式配置
@@ -134,31 +134,39 @@ classicLoadMoreFooterProps={{
 |------|------|------|
 | `onRefresh` | `() => void` | 下拉刷新回调 |
 | `onLoadMore` | `() => void` | 上拉加载回调 |
-| `onStateChanged` | `(event: {state: RefreshState}) => void` | 状态改变回调 |
-| `onHeaderMoving` | `(event: HeaderMovingEvent) => void` | Header 移动回调 |
-| `onFooterMoving` | `(event: FooterMovingEvent) => void` | Footer 移动回调 |
+| `onStateChanged` | `(state: RefreshState) => void` | 状态改变回调 |
+| `onHeaderMoving` | `(params: onHeaderMoveProps) => void` | Header 移动回调（Android 专属） |
+| `onFooterMoving` | `(params: onHeaderMoveProps) => void` | Footer 移动回调（Android 专属） |
 
 ## 类型定义
 
-### HeaderMovingEvent
+### RenderHeaderParams
+
+`renderHeader` 回调函数的参数类型：
 
 ```typescript
-interface HeaderMovingEvent {
+interface RenderHeaderParams {
+  /** 当前刷新状态 */
+  state: RefreshState;
+  
+  /** Header 移动参数（实时更新） */
+  moving: onHeaderMoveProps;
+  
+  /** 是否正在刷新 */
+  refreshing: boolean;
+}
+```
+
+详细说明请参考 [自定义 Header 文档](./CUSTOM_HEADER.md)。
+
+### onHeaderMoveProps
+
+```typescript
+interface onHeaderMoveProps {
   isDragging: boolean;   // 是否正在拖拽
   percent: number;       // 拖拽进度（0-N，超过1表示超过触发高度）
   offset: number;        // 当前偏移量（dp/pt，已转换为逻辑像素）
   headerHeight: number;  // Header 高度（dp/pt，已转换为逻辑像素）
-}
-```
-
-### FooterMovingEvent
-
-```typescript
-interface FooterMovingEvent {
-  isDragging: boolean;   // 是否正在拖拽
-  percent: number;       // 拖拽进度（0-N）
-  offset: number;        // 当前偏移量（dp/pt）
-  footerHeight: number;  // Footer 高度（dp/pt）
 }
 ```
 

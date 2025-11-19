@@ -2,7 +2,7 @@
  * @Author       : 尚博信_王强 wangqiang03@sunboxsoft.com
  * @Date         : 1985-10-26 16:15:00
  * @LastEditors  : 尚博信_王强 wangqiang03@sunboxsoft.com
- * @LastEditTime : 2025-11-13 13:58:32
+ * @LastEditTime : 2025-11-19 14:25:42
  * @FilePath     : /expo-smartrefreshlayout/example/index.ts
  * @Description  : 
  * 
@@ -10,7 +10,7 @@
  */
 import { registerRootComponent } from 'expo';
 
-import App from './App';
+import App from './DefaultHeaderExample';
 
 // registerRootComponent calls AppRegistry.registerComponent('main', () => App);
 // It also ensures that whether you load the app in Expo Go or in a native build,

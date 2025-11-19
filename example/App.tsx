@@ -2,7 +2,7 @@
  * @Author       : 尚博信_王强 wangqiang03@sunboxsoft.com
  * @Date         : 2025-11-12 10:14:48
  * @LastEditors  : 尚博信_王强 wangqiang03@sunboxsoft.com
- * @LastEditTime : 2025-11-13 13:59:28
+ * @LastEditTime : 2025-11-19 13:32:28
  * @FilePath     : /expo-smartrefreshlayout/example/App.tsx
  * @Description  : 
  * 
@@ -17,8 +17,8 @@ export default function App() {
   const [data, setData] = useState<string[]>(
     Array.from({ length: 20 }, (_, i) => `Item ${i + 1}`)
   );
-const [refreshState, setRefreshState] = useState(RefreshState.None);
-const [headerOffset, setHeaderOffset] = useState(0);
+  const [refreshState, setRefreshState] = useState(RefreshState.None);
+  const [headerOffset, setHeaderOffset] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
 
@@ -137,8 +137,6 @@ const [headerOffset, setHeaderOffset] = useState(0);
         onHeaderMoving={onHeaderMoving}
         onRefresh={handleRefresh}
         onStateChanged={handleStateChanged}
-        
-
         onLoadMore={handleLoadMore}>
         <FlatList
           data={data}
