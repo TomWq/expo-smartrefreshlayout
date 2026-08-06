@@ -1,191 +1,506 @@
-/*
- * @Author       : 尚博信_王强 wangqiang03@sunboxsoft.com
- * @Date         : 2025-11-12 10:14:48
- * @LastEditors  : 尚博信_王强 wangqiang03@sunboxsoft.com
- * @LastEditTime : 2025-11-19 13:32:28
- * @FilePath     : /expo-smartrefreshlayout/example/App.tsx
- * @Description  : 
- * 
- * Copyright (c) 2025 by 尚博信_王强, All Rights Reserved. 
- */
-import { ExpoSmartrefreshlayoutView, onHeaderMoveProps, RefreshState, } from 'expo-smartrefreshlayout';
-import { useState, useCallback } from 'react';
-import { FlatList, Text, View, StyleSheet, ActivityIndicator } from 'react-native';
+import { useCallback, useRef, useState } from 'react';
+import {
+  FlatList,
+  Pressable,
+  SafeAreaView,
+  StatusBar,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from 'react-native';
+import { SmartRefreshLayout } from 'expo-smartrefreshlayout';
+import type {
+  LoadMoreMode,
+  RefreshRequest,
+  RefreshState,
+  SmartRefreshLayoutRef,
+} from 'expo-smartrefreshlayout';
 
+const PAGE_SIZE = 15;
+const TOTAL_PAGES = 5;
+
+type FeedItem = {
+  id: string;
+  title: string;
+  detail: string;
+  color: string;
+};
+
+const COLORS = ['#1677ff', '#13c2c2', '#52c41a', '#fa8c16', '#eb2f96'];
+
+function createPage(page: number): FeedItem[] {
+  const start = (page - 1) * PAGE_SIZE;
+
+  return Array.from({ length: PAGE_SIZE }, (_, offset) => {
+    const number = start + offset + 1;
+    return {
+      id: `item-${number}`,
+      title: `消息条目 ${number}`,
+      detail: `第 ${page} 页 · 本地模拟数据 · ${number % 2 === 0 ? '已读' : '未读'}`,
+      color: COLORS[offset % COLORS.length],
+    };
+  });
+}
+
+const wait = (milliseconds: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function requestSourceLabel(request: RefreshRequest): string {
+  return request.source === 'programmatic' ? '主动调用' : '手势';
+}
 
 export default function App() {
-  const [data, setData] = useState<string[]>(
-    Array.from({ length: 20 }, (_, i) => `Item ${i + 1}`)
+  const refreshRef = useRef<SmartRefreshLayoutRef>(null);
+  const pageRef = useRef(1);
+  const failNextRequestRef = useRef(false);
+
+  const [items, setItems] = useState<FeedItem[]>(() => createPage(1));
+  const [hasMore, setHasMore] = useState(true);
+  const [loadMoreMode, setLoadMoreMode] = useState<LoadMoreMode>('pull');
+  const [headerStyle, setHeaderStyle] = useState<'classic' | 'material'>('classic');
+  const [failNextRequest, setFailNextRequest] = useState(false);
+  const [nativeState, setNativeState] = useState<RefreshState>('idle');
+  const [notice, setNotice] = useState('准备就绪：先试试下拉刷新或上拉加载');
+
+  const consumeFailureSwitch = useCallback(() => {
+    const shouldFail = failNextRequestRef.current;
+    failNextRequestRef.current = false;
+    setFailNextRequest(false);
+    return shouldFail;
+  }, []);
+
+  const refresh = useCallback(
+    async (request: RefreshRequest) => {
+      setNotice(`刷新开始 · ${requestSourceLabel(request)} · requestId ${request.requestId}`);
+      await wait(900);
+
+      if (consumeFailureSwitch()) {
+        throw new Error('模拟刷新失败：网络请求被拒绝');
+      }
+
+      pageRef.current = 1;
+      setItems(createPage(1));
+      setHasMore(true);
+      setNotice(`刷新完成 · ${requestSourceLabel(request)} · 已回到第 1 页`);
+    },
+    [consumeFailureSwitch]
   );
-  const [refreshState, setRefreshState] = useState(RefreshState.None);
-  const [headerOffset, setHeaderOffset] = useState(0);
-  const [refreshing, setRefreshing] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
 
-  const handleRefresh = useCallback(() => {
-    console.log('刷新触发');
-    setRefreshing(true);
+  const loadMore = useCallback(
+    async (request: RefreshRequest) => {
+      const nextPage = pageRef.current + 1;
+      setNotice(
+        `分页开始 · ${requestSourceLabel(request)} · requestId ${request.requestId} · 第 ${nextPage} 页`
+      );
+      await wait(700);
 
-    // 模拟加载数据
-    setTimeout(() => {
-      setData(Array.from({ length: 20 }, (_, i) => `新Item ${i + 1}`));
-      setRefreshing(false);
-      console.log('刷新完成');
-    }, 2000);
+      if (consumeFailureSwitch()) {
+        throw new Error('模拟分页失败：服务端返回错误');
+      }
+
+      if (nextPage > TOTAL_PAGES) {
+        setHasMore(false);
+        return { hasMore: false };
+      }
+
+      const nextItems = createPage(nextPage);
+      const nextHasMore = nextPage < TOTAL_PAGES;
+      pageRef.current = nextPage;
+      setItems((currentItems) => [...currentItems, ...nextItems]);
+      setHasMore(nextHasMore);
+      setNotice(`分页完成 · 当前第 ${nextPage} 页 · ${nextHasMore ? '还可继续加载' : '已到末页'}`);
+      return { hasMore: nextHasMore };
+    },
+    [consumeFailureSwitch]
+  );
+
+  const handleProgrammaticRefresh = useCallback(() => {
+    const accepted = refreshRef.current?.beginRefresh(150) === true;
+    setNotice(accepted ? '已排队主动刷新 · 150ms 后触发' : '刷新/分页正在进行，本次主动刷新被忽略');
   }, []);
 
-  const handleLoadMore = useCallback(() => {
-    console.log('加载更多触发');
-    setLoadingMore(true);
-
-    // 模拟加载数据
-    setTimeout(() => {
-      const newData = Array.from({ length: 10 }, (_, i) => `新Item ${data.length + i + 1}`);
-      setData(prevData => [...prevData, ...newData]);
-      setLoadingMore(false);
-      console.log('加载更多完成');
-    }, 2000);
-  }, [data.length]);
-
-
-  const onHeaderMoving = (params: onHeaderMoveProps) => {
-    setHeaderOffset(params.offset);
-   
-  }
-
-  const onFooterMoving = useCallback((params: any) => {
-    console.log('Footer 移动:', params);
+  const resetPagination = useCallback(() => {
+    pageRef.current = 1;
+    setItems(createPage(1));
+    setHasMore(true);
+    refreshRef.current?.resetNoMoreData();
+    setNotice('分页已重置 · 当前为第 1 页');
   }, []);
 
-  const handleStateChanged = (state: RefreshState) => {
-    const stateNames: { [key: number]: string } = {
-      [RefreshState.None]: '无状态',
-      [RefreshState.PullDownToRefresh]: '下拉刷新',
-      [RefreshState.ReleaseToRefresh]: '释放立即刷新',
-      [RefreshState.Refreshing]: '正在刷新',
-      [RefreshState.RefreshFinish]: '刷新完成',
-      [RefreshState.PullUpToLoad]: '上拉加载',
-      [RefreshState.ReleaseToLoad]: '释放立即加载',
-      [RefreshState.Loading]: '正在加载',
-      [RefreshState.LoadFinish]: '加载完成',
-      [RefreshState.NoMoreData]: '没有更多数据',
-    };
-    setRefreshState(state);
-    console.log('状态改变:', stateNames[state] || `未知状态(${state})`);
-  };
-
-  const renderItem = useCallback(({ item }: { item: string }) => (
-    <View style={styles.item}>
-      <Text style={styles.itemText}>{item}</Text>
-    </View>
-  ), []);
+  const toggleFailure = useCallback((value: boolean) => {
+    failNextRequestRef.current = value;
+    setFailNextRequest(value);
+    setNotice(value ? '下一次刷新或分页会失败' : '已取消下一次失败模拟');
+  }, []);
 
   return (
+    <SafeAreaView style={styles.screen}>
+      <StatusBar barStyle="dark-content" />
 
-    <View style={styles.container}>
-      <ExpoSmartrefreshlayoutView
+      <View style={styles.toolbar}>
+        <View style={styles.headingRow}>
+          <View style={styles.headingCopy}>
+            <Text style={styles.title}>SmartRefreshLayout</Text>
+            <Text style={styles.subtitle}>Fabric + Codegen 真机验证页</Text>
+          </View>
+          <View style={styles.countBadge}>
+            <Text style={styles.countValue}>{items.length}</Text>
+            <Text style={styles.countLabel}>条</Text>
+          </View>
+        </View>
+
+        <View style={styles.actionRow}>
+          <Pressable style={styles.primaryButton} onPress={handleProgrammaticRefresh}>
+            <Text style={styles.primaryButtonText}>主动刷新</Text>
+          </Pressable>
+          <Pressable style={styles.secondaryButton} onPress={resetPagination}>
+            <Text style={styles.secondaryButtonText}>重置分页</Text>
+          </Pressable>
+          <View style={styles.failureSwitch}>
+            <Text style={styles.switchLabel}>下次失败</Text>
+            <Switch
+              value={failNextRequest}
+              onValueChange={toggleFailure}
+              trackColor={{ false: '#d9d9d9', true: '#ff7875' }}
+              thumbColor="#ffffff"
+            />
+          </View>
+        </View>
+
+        <View style={styles.optionRow}>
+          <Text style={styles.optionLabel}>分页触发</Text>
+          <View style={styles.segmentedControl}>
+            <Pressable
+              style={[styles.segment, loadMoreMode === 'pull' && styles.segmentActive]}
+              onPress={() => setLoadMoreMode('pull')}
+            >
+              <Text style={[styles.segmentText, loadMoreMode === 'pull' && styles.segmentTextActive]}>
+                上拉释放
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.segment, loadMoreMode === 'auto' && styles.segmentActive]}
+              onPress={() => setLoadMoreMode('auto')}
+            >
+              <Text style={[styles.segmentText, loadMoreMode === 'auto' && styles.segmentTextActive]}>
+                滚动到底
+              </Text>
+            </Pressable>
+          </View>
+          <Text style={styles.optionLabel}>Header</Text>
+          <View style={styles.segmentedControlSmall}>
+            <Pressable
+              style={[styles.segment, headerStyle === 'classic' && styles.segmentActive]}
+              onPress={() => setHeaderStyle('classic')}
+            >
+              <Text style={[styles.segmentText, headerStyle === 'classic' && styles.segmentTextActive]}>
+                Classic
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.segment, headerStyle === 'material' && styles.segmentActive]}
+              onPress={() => setHeaderStyle('material')}
+            >
+              <Text style={[styles.segmentText, headerStyle === 'material' && styles.segmentTextActive]}>
+                Material
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={styles.statusRow}>
+          <View style={[styles.stateDot, nativeState === 'idle' && styles.stateDotIdle]} />
+          <Text style={styles.statusText} numberOfLines={2}>
+            {notice}
+          </Text>
+          <Text style={styles.nativeState}>原生: {nativeState}</Text>
+        </View>
+      </View>
+
+      <SmartRefreshLayout
+        ref={refreshRef}
         style={styles.refreshLayout}
-         
-        // renderHeader={() => (
-        //     <View 
-           
-        //     style={{ height: 80, backgroundColor: 'red' ,justifyContent: 'center', alignItems: 'center'}}>
-        //       {refreshState === RefreshState.PullDownToRefresh && (
-        //         <Text style={{ fontSize: 16, color: 'white' }}>下拉刷新</Text>
-        //       )}
-        //       {refreshState === RefreshState.ReleaseToRefresh && (
-        //         <Text style={{ fontSize: 16, color: 'white' }}>释放立即刷新</Text>
-        //       )}
-        //       {refreshState === RefreshState.Refreshing && (
-        //         <ActivityIndicator color="white" />
-        //       )}
-        //       {/* 根据下拉距离显示不同内容 */}
-        //       <Text style={{ fontSize: 14, color: 'white' }}>下拉距离: {headerOffset}px</Text>
-        //     </View>
-        //   )}
-          
-        // headerType="material"
-        // classicRefreshHeaderProps={{
-        //   // 文字定制
-        //   REFRESH_HEADER_PULLING: '下拉刷新',
-        //   REFRESH_HEADER_RELEASE: '释放刷新',
-        //   REFRESH_HEADER_REFRESHING: '加载中...',
-        //   REFRESH_HEADER_FINISH: '刷新完成啦',
-
-        //   // 样式定制
-        //   headerAccentColor: '#FF5722',
-        //   headerPrimaryColor: '#ffffff',
-        //   headerTitleTextSize: 14,
-        //   headerFinishDuration: 300,
-        //   headerDrawableArrowSize: 14,
-        //   headerDrawableProgressSize: 24,
-
-        // }}
-        // classicLoadMoreFooterProps={{
-        //   // Footer 定制
-        //   REFRESH_FOOTER_PULLING: '上拉加载',
-        //   REFRESH_FOOTER_LOADING: '加载中...',
-        //   REFRESH_FOOTER_RELEASE: '释放加载更多',
-        //   REFRESH_FOOTER_NOTHING: '没有更多数据了',
-
-        //   footerAccentColor: '#4CAF50',
-        //   footerTitleTextSize: 14,
-        //   footerDrawableArrowSize: 14,
-
-        //   footerFinishDuration: 0
-        // }}
-        onHeaderMoving={onHeaderMoving}
-        onRefresh={handleRefresh}
-        onStateChanged={handleStateChanged}
-        onLoadMore={handleLoadMore}>
+        loadMoreMode={loadMoreMode}
+        hasMore={hasMore}
+        headerStyle={headerStyle}
+        hapticsEnabled
+        indicatorColor="#1677ff"
+        titleColor="#595959"
+        messages={{
+          pullDown: '下拉刷新',
+          releaseToRefresh: '松开刷新',
+          refreshing: '正在刷新...',
+          refreshComplete: '刷新完成',
+          pullUp: '上拉加载更多',
+          releaseToLoadMore: '松开加载',
+          loadingMore: '正在加载...',
+          noMoreData: '没有更多数据了',
+        }}
+        onRefresh={refresh}
+        onLoadMore={loadMore}
+        onRefreshError={(error) => setNotice(`刷新失败 · ${getErrorMessage(error)}`)}
+        onLoadMoreError={(error) => setNotice(`分页失败 · ${getErrorMessage(error)}`)}
+        onStateChange={setNativeState}
+      >
         <FlatList
-          data={data}
-          renderItem={renderItem}
-          keyExtractor={(item, index) => index.toString()}
           style={styles.list}
+          data={items}
+          keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
-         
+          renderItem={({ item }) => (
+            <View style={styles.itemRow}>
+              <View style={[styles.itemMarker, { backgroundColor: item.color }]} />
+              <View style={styles.itemCopy}>
+                <Text style={styles.itemTitle}>{item.title}</Text>
+                <Text style={styles.itemDetail}>{item.detail}</Text>
+              </View>
+            </View>
+          )}
+          ListHeaderComponent={
+            <View style={styles.listHeader}>
+              <Text style={styles.listHeaderTitle}>可滚动测试列表</Text>
+              <Text style={styles.listHeaderText}>
+                不使用 FlatList.onEndReached，分页完全由 SmartRefreshLayout 负责。
+              </Text>
+            </View>
+          }
+          ListFooterComponent={
+            <View style={styles.listFooter}>
+              <Text style={styles.listFooterText}>
+                {hasMore ? '继续向上滚动，或上拉释放触发下一页' : '已加载全部模拟数据，可点击“重置分页”'}
+              </Text>
+            </View>
+          }
         />
-
-      </ExpoSmartrefreshlayoutView>
-
-    </View>
+      </SmartRefreshLayout>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-    paddingTop: 60
+    backgroundColor: '#f5f7fa',
+  },
+  toolbar: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 10,
+    backgroundColor: '#ffffff',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#d9d9d9',
+  },
+  headingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headingCopy: {
+    flex: 1,
+  },
+  title: {
+    color: '#1f1f1f',
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  subtitle: {
+    marginTop: 3,
+    color: '#8c8c8c',
+    fontSize: 12,
+  },
+  countBadge: {
+    minWidth: 54,
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    backgroundColor: '#e6f4ff',
+    borderRadius: 6,
+  },
+  countValue: {
+    color: '#0958d9',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  countLabel: {
+    color: '#1677ff',
+    fontSize: 11,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    gap: 8,
+  },
+  primaryButton: {
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    backgroundColor: '#1677ff',
+    borderRadius: 6,
+  },
+  primaryButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  secondaryButton: {
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    backgroundColor: '#f0f5ff',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#adc6ff',
+    borderRadius: 6,
+  },
+  secondaryButtonText: {
+    color: '#0958d9',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  failureSwitch: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 'auto',
+  },
+  switchLabel: {
+    color: '#595959',
+    fontSize: 12,
+  },
+  optionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+    gap: 7,
+  },
+  optionLabel: {
+    color: '#8c8c8c',
+    fontSize: 11,
+  },
+  segmentedControl: {
+    flexDirection: 'row',
+    flex: 1,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#d9d9d9',
+    borderRadius: 5,
+    overflow: 'hidden',
+  },
+  segmentedControlSmall: {
+    flexDirection: 'row',
+    flex: 1,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#d9d9d9',
+    borderRadius: 5,
+    overflow: 'hidden',
+  },
+  segment: {
+    flex: 1,
+    minHeight: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+  },
+  segmentActive: {
+    backgroundColor: '#e6f4ff',
+  },
+  segmentText: {
+    color: '#8c8c8c',
+    fontSize: 11,
+  },
+  segmentTextActive: {
+    color: '#0958d9',
+    fontWeight: '600',
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 26,
+    marginTop: 8,
+  },
+  stateDot: {
+    width: 7,
+    height: 7,
+    marginRight: 7,
+    borderRadius: 4,
+    backgroundColor: '#fa8c16',
+  },
+  stateDotIdle: {
+    backgroundColor: '#52c41a',
+  },
+  statusText: {
+    flex: 1,
+    color: '#595959',
+    fontSize: 11,
+  },
+  nativeState: {
+    marginLeft: 8,
+    color: '#8c8c8c',
+    fontSize: 10,
   },
   refreshLayout: {
     flex: 1,
-
   },
   list: {
     flex: 1,
   },
   listContent: {
-    padding: 10,
+    padding: 12,
+    paddingBottom: 28,
   },
-  item: {
-    backgroundColor: '#fff',
-    padding: 20,
-    marginVertical: 5,
-    marginHorizontal: 10,
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+  listHeader: {
+    marginBottom: 10,
+    padding: 14,
+    backgroundColor: '#ffffff',
+    borderRadius: 6,
   },
-  itemText: {
-    fontSize: 16,
-    color: '#333',
+  listHeaderTitle: {
+    color: '#262626',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  listHeaderText: {
+    marginTop: 4,
+    color: '#8c8c8c',
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  itemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 68,
+    marginBottom: 8,
+    padding: 14,
+    backgroundColor: '#ffffff',
+    borderRadius: 6,
+  },
+  itemMarker: {
+    width: 4,
+    height: 38,
+    marginRight: 12,
+    borderRadius: 2,
+  },
+  itemCopy: {
+    flex: 1,
+  },
+  itemTitle: {
+    color: '#262626',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  itemDetail: {
+    marginTop: 4,
+    color: '#8c8c8c',
+    fontSize: 12,
+  },
+  listFooter: {
+    alignItems: 'center',
+    paddingVertical: 14,
+  },
+  listFooterText: {
+    color: '#8c8c8c',
+    fontSize: 12,
+    textAlign: 'center',
   },
 });

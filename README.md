@@ -1,225 +1,199 @@
 # expo-smartrefreshlayout
 
-一个功能强大的 React Native 下拉刷新和上拉加载组件，**基于 Expo Modules 开发**，使用原生库实现：
+React Native 新架构下的原生下拉刷新和上拉加载容器。
+
 - Android: [SmartRefreshLayout](https://github.com/scwang90/SmartRefreshLayout)
 - iOS: [MJRefresh](https://github.com/CoderMJLee/MJRefresh)
+- React Native: Fabric Native Component + Codegen Commands
 
-> 💡 本组件使用 [Expo Modules API](https://docs.expo.dev/modules/overview/) 构建，提供了类型安全的原生模块接口和优秀的开发体验。
+v2 不再依赖 Expo Modules API，也不要求应用安装 `expo`。库内没有全局原生服务，因此实例操作直接使用 Fabric Commands；这里不额外放置一个没有职责的 TurboModule。
 
-## ✨ 特性
+## 要求
 
-- ✅ 支持下拉刷新和上拉加载
-- ✅ 支持自定义刷新头和加载尾样式
-- ✅ 支持经典（Classic）和 Material Design 两种样式
-- ✅ 支持 Lottie 动画集成，可实现精美的自定义动画效果
-- ✅ 丰富的配置选项和事件回调
-- ✅ 完整的 TypeScript 类型定义
-- ✅ 支持自动加载更多
-- ✅ 支持嵌套滚动
-- ✅ 流畅的动画效果
-- ✅ 跨平台支持（Android & iOS）
-- ✅ 支持自定义 Header 组件（Footer 自定义功能待实现）
-- ✅ 完整的状态追踪和实时回调
-- ✅ 同时支持 React Native 新旧架构（Paper & Fabric）
+| 环境 | 最低版本 |
+| --- | --- |
+| React Native | 0.76 |
+| React | 18.2 |
+| iOS | 15.1 |
+| Android | API 24 |
 
-## 📦 安装
+应用必须启用 React Native New Architecture。Expo 项目可以使用 development build，但不能在 Expo Go 中运行。
+
+## 安装
 
 ```bash
-npm install expo-smartrefreshlayout
-# 或
-yarn add expo-smartrefreshlayout
-# 或
-pnpm add expo-smartrefreshlayout
+npm install expo-smartrefreshlayout@next
 ```
 
-### Expo 项目
-
-如果你使用的是 Expo 管理的项目，安装后需要重新构建原生代码：
+iOS 安装原生依赖：
 
 ```bash
-# 使用 EAS Build
-eas build --platform all
-
-# 或使用本地构建
-npx expo prebuild
-npx expo run:android
-npx expo run:ios
+cd ios && pod install
 ```
 
-### 纯 React Native 项目
+然后重新构建应用。React Native CLI 和 Expo prebuild 项目都会通过 autolinking 接入，无需手动注册原生包。
 
-对于纯 React Native 项目，确保已安装 `expo` 包作为依赖：
+## 基础用法
 
-```bash
-npm install expo
-# 然后重新构建应用
-npx react-native run-android
-npx react-native run-ios
-```
-
-## 🚀 快速开始
-
-### 基础用法
+`onRefresh` 和 `onLoadMore` 可以直接返回 Promise。默认非受控模式下，Promise 结束后组件会自动收起原生动画；失败时也会正确结束动画。
 
 ```tsx
-import { ExpoSmartrefreshlayoutView, ExpoSmartrefreshlayoutModule } from 'expo-smartrefreshlayout';
-import { FlatList, View, Text } from 'react-native';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
+import { FlatList, Text } from 'react-native';
+import { SmartRefreshLayout } from 'expo-smartrefreshlayout';
 
-function App() {
-  const [data, setData] = useState([1, 2, 3, 4, 5]);
+export function MessageList() {
+  const [items, setItems] = useState<string[]>([]);
+  const [hasMore, setHasMore] = useState(true);
 
-  const handleRefresh = async () => {
-    // 执行刷新逻辑
-    await fetchData();
-    // 完成刷新
-    ExpoSmartrefreshlayoutModule.finishRefresh(true, 300);
-  };
+  const refresh = useCallback(async () => {
+    const firstPage = await api.list({ page: 1 });
+    setItems(firstPage.items);
+    setHasMore(firstPage.hasMore);
+  }, []);
+
+  const loadMore = useCallback(async () => {
+    const nextPage = await api.list({ offset: items.length });
+    setItems((current) => [...current, ...nextPage.items]);
+    setHasMore(nextPage.hasMore);
+    return { hasMore: nextPage.hasMore };
+  }, [items.length]);
 
   return (
-    <ExpoSmartrefreshlayoutView
+    <SmartRefreshLayout
       style={{ flex: 1 }}
-      onRefresh={handleRefresh}
+      hasMore={hasMore}
+      onRefresh={refresh}
+      onLoadMore={loadMore}
     >
       <FlatList
-        data={data}
-        renderItem={({ item }) => (
-          <View style={{ padding: 20, borderBottomWidth: 1 }}>
-            <Text>Item {item}</Text>
-          </View>
-        )}
-        keyExtractor={(item) => item.toString()}
+        data={items}
+        keyExtractor={(item) => item}
+        renderItem={({ item }) => <Text>{item}</Text>}
       />
-    </ExpoSmartrefreshlayoutView>
+    </SmartRefreshLayout>
   );
 }
 ```
 
-### 启用加载更多
+`SmartRefreshLayout` 只接受一个原生滚动子组件。需要组合空状态或浮层时，请在外部布局中组合，不要在刷新容器里并列放多个子节点。
+
+默认分页模式是 `loadMoreMode="pull"`，必须上拉并释放才触发。`loadMoreMode="auto"` 只有在内容超过一屏且用户真实向上滚动后才会解锁，不会在首次挂载或短列表时自行触发。一次请求完成后，下一次自动加载仍需要新的向上滚动。
+
+## 定制显示
 
 ```tsx
-<ExpoSmartrefreshlayoutView
-  enableLoadMore={true}
-  onRefresh={handleRefresh}
-  onLoadMore={handleLoadMore}
->
-  <FlatList data={data} {...listProps} />
-</ExpoSmartrefreshlayoutView>
-```
-
-### 自定义样式
-
-```tsx
-<ExpoSmartrefreshlayoutView
-  headerType="material"
-  classicRefreshHeaderProps={{
-    headerAccentColor: '#007AFF',
-    REFRESH_HEADER_PULLING: '下拉刷新',
-    REFRESH_HEADER_RELEASE: '释放刷新',
+<SmartRefreshLayout
+  headerStyle="material"
+  indicatorColor="#1677ff"
+  titleColor="#333333"
+  messages={{
+    pullDown: '下拉刷新',
+    releaseToRefresh: '松开刷新',
+    refreshing: '正在刷新...',
+    refreshComplete: '刷新完成',
+    pullUp: '上拉加载更多',
+    releaseToLoadMore: '松开加载',
+    loadingMore: '正在加载...',
+    noMoreData: '没有更多数据',
   }}
-  onRefresh={handleRefresh}
+  onRefresh={refresh}
 >
-  <FlatList data={data} {...listProps} />
-</ExpoSmartrefreshlayoutView>
+  <FlatList {...listProps} />
+</SmartRefreshLayout>
 ```
 
-## 📖 文档
+## 受控模式
 
-- **[API 文档](./docs/API.md)** - 完整的 Props、方法和类型定义
-- **[自定义 Header 文档](./docs/CUSTOM_HEADER.md)** - 自定义下拉刷新 Header 的完整指南
-- **[示例代码](./docs/EXAMPLES.md)** - 丰富的使用示例和最佳实践
-
-## 🏗️ 架构支持
-
-本组件基于 Expo Modules API 构建，**自动支持 React Native 的新旧架构**：
-
-- ✅ **旧架构（Paper）**：React Native < 0.74
-- ✅ **新架构（Fabric）**：React Native >= 0.68
-- ✅ **零配置切换**：组件会根据项目架构自动适配
-
-## 🎯 核心 API
-
-### 主要 Props
-
-| 属性 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `enableRefresh` | `boolean` | `true` | 是否启用下拉刷新 |
-| `enableLoadMore` | `boolean` | `false` | 是否启用上拉加载 |
-| `headerType` | `'classics' \| 'material'` | `'classics'` | Header 类型 |
-| `renderHeader` | `(params: RenderHeaderParams) => React.ReactNode` | - | 自定义 Header 组件，接收状态参数 |
-| `onRefresh` | `() => void` | - | 下拉刷新回调 |
-| `onLoadMore` | `() => void` | - | 上拉加载回调 |
-
-### 主要方法
+传入 `refreshing` 或 `loadingMore` 后，对应动画由调用方控制。回调完成不会自动修改受控值。
 
 ```tsx
-import { ExpoSmartrefreshlayoutModule } from 'expo-smartrefreshlayout';
+const [refreshing, setRefreshing] = useState(false);
 
-// 完成刷新
-ExpoSmartrefreshlayoutModule.finishRefresh(success?: boolean, delay?: number);
-
-// 完成加载更多
-ExpoSmartrefreshlayoutModule.finishLoadMore(success?: boolean, delay?: number, noMoreData?: boolean);
-
-// 自动刷新
-ExpoSmartrefreshlayoutModule.autoRefresh(delay?: number);
-
-// 设置没有更多数据
-ExpoSmartrefreshlayoutModule.setNoMoreData(noMoreData: boolean);
-```
-
-> ⚠️ **重要提示**：虽然组件内部有 3 秒自动结束机制，但**强烈建议手动调用** `finishRefresh/finishLoadMore` 方法以获得最佳用户体验。
-
-## 💡 常见场景
-
-### 场景 1：只需要下拉刷新（推荐）
-
-使用 FlatList 自带的 `onEndReached` 处理加载更多：
-
-```tsx
-<ExpoSmartrefreshlayoutView onRefresh={handleRefresh}>
-  <FlatList
-    data={data}
-    onEndReached={handleEndReached}
-    onEndReachedThreshold={0.1}
-    renderItem={({ item }) => <Item data={item} />}
-  />
-</ExpoSmartrefreshlayoutView>
-```
-
-### 场景 2：需要统一的刷新和加载更多 UI
-
-显式启用 `enableLoadMore`：
-
-```tsx
-<ExpoSmartrefreshlayoutView
-  enableLoadMore={true}
-  onRefresh={handleRefresh}
-  onLoadMore={handleLoadMore}
+<SmartRefreshLayout
+  refreshing={refreshing}
+  onRefresh={async () => {
+    setRefreshing(true);
+    try {
+      await reload();
+    } finally {
+      setRefreshing(false);
+    }
+  }}
 >
-  <FlatList data={data} renderItem={({ item }) => <Item data={item} />} />
-</ExpoSmartrefreshlayoutView>
+  <FlatList {...listProps} />
+</SmartRefreshLayout>;
 ```
 
+## 实例命令
 
-## 📄 许可证
+命令属于具体视图实例，通过 ref 调用，不再使用全局 module：
+
+```tsx
+import { useRef } from 'react';
+import type { SmartRefreshLayoutRef } from 'expo-smartrefreshlayout';
+
+const refreshRef = useRef<SmartRefreshLayoutRef>(null);
+
+refreshRef.current?.beginRefresh();
+refreshRef.current?.finishRefresh({ success: true, delay: 200 });
+refreshRef.current?.beginLoadMore();
+refreshRef.current?.finishLoadMore({ success: true, hasMore: false });
+refreshRef.current?.resetNoMoreData();
+
+<SmartRefreshLayout ref={refreshRef} onRefresh={refresh}>
+  <FlatList {...listProps} />
+</SmartRefreshLayout>;
+```
+
+通常不需要手动结束动画。主动触发刷新、受控状态机或需要覆盖默认成功/失败展示时才使用实例命令；非受控回调若不是 Promise，会在同步返回后立即结束，旧的回调式请求应先包装成 Promise。
+
+`beginRefresh` 和 `beginLoadMore` 在当前实例已有请求时返回 `false`；成功接受时返回 `true`。刷新和分页共享同一把实例锁，过期请求的完成命令不会结束较新的动画。
+
+## 文档
+
+- [完整 API](./docs/API.md)
+- [常用示例](./docs/EXAMPLES.md)
+- [v1 到 v2 迁移](./docs/MIGRATION.md)
+
+## 架构说明
+
+`SmartRefreshLayout` 是一个 Fabric Native Component。Props 和事件由 RN Codegen 生成类型安全的原生接口，`beginRefresh`、`finishRefresh` 等实例动作由 Fabric Commands 分发。
+
+TurboModule 适合不属于某个视图实例的原生能力。这个库的状态全部属于刷新容器实例，如果使用全局 TurboModule，多个列表同时存在时反而无法可靠定位目标视图。因此 v2 有意不提供全局原生 module。
+
+## 本地开发
+
+```bash
+npm install
+npm run typecheck
+npm run codegen
+npm run build
+npm test -- --runInBand
+```
+
+JS 产物使用 React Native Builder Bob 构建；仓库本身不会用 `create-react-native-library` 重新生成。原生 Fabric 组件、Codegen 契约和现有包名仍由本仓库维护。
+
+示例工程位于 `example/`，启用了 New Architecture。
+
+运行本地真机示例：
+
+```bash
+cd example
+npm install
+npx expo start --clear
+```
+
+另开终端构建并安装原生 Development Build：
+
+```bash
+npx expo run:android --device --no-bundler
+# 或
+npx expo run:ios --device --no-bundler
+```
+
+示例通过 Expo Autolinking 的 `searchPaths` 直接使用仓库根目录源码，不要把仓库配置成 `file:..` 依赖；后者会把整个示例目录递归复制进 `node_modules`。首次运行必须使用 Development Build，不能使用 Expo Go。
+
+## License
 
 MIT
-
-## 🔗 相关链接
-
-- [API 文档](./docs/API.md)
-- [自定义 Header 文档](./docs/CUSTOM_HEADER.md)
-- [示例代码](./docs/EXAMPLES.md)
-- [SmartRefreshLayout (Android)](https://github.com/scwang90/SmartRefreshLayout)
-- [MJRefresh (iOS)](https://github.com/CoderMJLee/MJRefresh)
-
-
-## 📮 反馈与支持
-
-如果你在使用过程中遇到问题或有任何建议，欢迎：
-
-- 📝 提交 [GitHub Issue](https://github.com/TomWq/expo-smartrefreshlayout/issues)
-- 💬 参与 [Discussions](https://github.com/TomWq/expo-smartrefreshlayout/discussions)
-- ⭐ 给项目点个 Star 支持一下
-- 💬 加入 QQ 群：952241387 

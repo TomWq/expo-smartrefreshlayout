@@ -16,12 +16,13 @@
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
+    "babel-preset-expo": "~54.0.7",
     "typescript": "~5.9.2"
   },
   "private": true,
   "expo": {
     "autolinking": {
-      "nativeModulesDir": ".."
+      "searchPaths": ["./node_modules", ".."]
     }
   }
 }

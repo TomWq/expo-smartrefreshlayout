@@ -3,8 +3,8 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
-      "expo-smartrefreshlayout": ["../src/index"],
-      "expo-smartrefreshlayout/*": ["../src/*"]
+      "expo-smartrefreshlayout": ["../src/index"]
     }
-  }
+  },
+  "include": ["App.tsx", "index.ts"]
 }

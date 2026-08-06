@@ -1,52 +1,114 @@
 {
   "name": "expo-smartrefreshlayout",
-  "version": "1.0.0",
-  "description": "一个功能强大的 React Native 下拉刷新和上拉加载组件，基于 Expo Modules 开发，使用原生库实现（Android: SmartRefreshLayout, iOS: MJRefresh）",
-  "main": "build/index.js",
-  "types": "build/index.d.ts",
+  "version": "2.0.0-alpha.0",
+  "description": "A React Native Fabric pull-to-refresh and load-more component backed by SmartRefreshLayout and MJRefresh",
+  "main": "./lib/module/index.js",
+  "types": "./lib/typescript/src/index.d.ts",
+  "react-native": "src/index.ts",
+  "exports": {
+    ".": {
+      "react-native": "./src/index.ts",
+      "types": "./lib/typescript/src/index.d.ts",
+      "import": "./lib/module/index.js",
+      "default": "./lib/module/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "android/build.gradle",
+    "android/src",
+    "ios",
+    "src",
+    "docs",
+    "lib",
+    "ExpoSmartrefreshlayout.podspec",
+    "react-native.config.js",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
-    "build": "expo-module build",
-    "clean": "expo-module clean",
-    "lint": "expo-module lint",
-    "test": "expo-module test",
-    "prepare": "expo-module prepare",
-    "prepublishOnly": "expo-module prepublishOnly",
-    "expo-module": "expo-module",
-    "open:ios": "xed example/ios",
-    "npm:publish": "npm publish",
-    "open:android": "open -a \"Android Studio\" example/android"
+    "build": "bob build",
+    "clean": "rimraf lib build android/build ios/build generated",
+    "codegen": "node node_modules/react-native/scripts/generate-codegen-artifacts.js -p . -t all -s library -o generated",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "jest",
+    "prepare": "bob build",
+    "prepack": "npm run typecheck"
+  },
+  "codegenConfig": {
+    "name": "ExpoSmartRefreshLayoutSpec",
+    "type": "components",
+    "jsSrcsDir": "src",
+    "android": {
+      "javaPackageName": "com.exposmartrefreshlayout"
+    },
+    "ios": {
+      "components": {
+        "ExpoSmartRefreshLayoutView": {
+          "className": "ExpoSmartRefreshLayoutView"
+        }
+      }
+    }
+  },
+  "react-native-builder-bob": {
+    "source": "src",
+    "output": "lib",
+    "targets": [
+      [
+        "module",
+        {
+          "esm": true
+        }
+      ],
+      [
+        "typescript",
+        {
+          "project": "tsconfig.build.json"
+        }
+      ]
+    ]
   },
   "keywords": [
     "react-native",
-    "expo",
-    "expo-module",
-    "expo-smartrefreshlayout",
+    "fabric",
+    "new-architecture",
     "refresh",
     "pull-to-refresh",
     "load-more",
     "smartrefreshlayout",
     "mjrefresh",
     "android",
-    "ios",
-    "typescript"
+    "ios"
   ],
-  "repository": "https://github.com/TomWq/expo-smartrefreshlayout",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TomWq/expo-smartrefreshlayout.git"
+  },
   "bugs": {
     "url": "https://github.com/TomWq/expo-smartrefreshlayout/issues"
   },
   "author": "尚博信_王强 <wangqiang03@sunboxsoft.com> (https://github.com/TomWq)",
   "license": "MIT",
   "homepage": "https://github.com/TomWq/expo-smartrefreshlayout#readme",
-  "dependencies": {},
   "devDependencies": {
-    "@types/react": "~19.1.0",
-    "expo-module-scripts": "^5.0.7",
-    "expo": "^54.0.18",
-    "react-native": "0.81.5"
+    "@react-native/babel-preset": "^0.81.5",
+    "@types/jest": "^29.5.14",
+    "@types/react": "^19.1.0",
+    "@types/react-test-renderer": "^19.1.0",
+    "babel-jest": "^29.7.0",
+    "jest": "^29.7.0",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-builder-bob": "^0.43.0",
+    "react-test-renderer": "^19.1.0",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.9.2"
   },
   "peerDependencies": {
-    "expo": "*",
-    "react": "*",
-    "react-native": "*"
+    "react": ">=18.2.0",
+    "react-native": ">=0.76.0"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }

@@ -1,0 +1,124 @@
+package com.exposmartrefreshlayout
+
+import android.view.View
+import com.facebook.react.bridge.Arguments
+import com.facebook.react.bridge.ReactApplicationContext
+import com.facebook.react.module.annotations.ReactModule
+import com.facebook.react.uimanager.ThemedReactContext
+import com.facebook.react.uimanager.UIManagerHelper
+import com.facebook.react.uimanager.ViewGroupManager
+import com.facebook.react.uimanager.ViewManagerDelegate
+import com.facebook.react.viewmanagers.ExpoSmartRefreshLayoutViewManagerDelegate
+import com.facebook.react.viewmanagers.ExpoSmartRefreshLayoutViewManagerInterface
+
+@ReactModule(name = ExpoSmartRefreshLayoutViewManager.NAME)
+internal class ExpoSmartRefreshLayoutViewManager :
+  ViewGroupManager<ExpoSmartRefreshLayoutView>(),
+  ExpoSmartRefreshLayoutViewManagerInterface<ExpoSmartRefreshLayoutView> {
+
+  private val delegate = ExpoSmartRefreshLayoutViewManagerDelegate(this)
+
+  override fun getName(): String = NAME
+
+  override fun getDelegate(): ViewManagerDelegate<ExpoSmartRefreshLayoutView> = delegate
+
+  override fun createViewInstance(reactContext: ThemedReactContext): ExpoSmartRefreshLayoutView =
+    ExpoSmartRefreshLayoutView(reactContext)
+
+  override fun addView(parent: ExpoSmartRefreshLayoutView, child: View, index: Int) {
+    parent.addReactChild(child, index)
+  }
+
+  override fun getChildCount(parent: ExpoSmartRefreshLayoutView): Int = parent.getReactChildCount()
+
+  override fun getChildAt(parent: ExpoSmartRefreshLayoutView, index: Int): View? =
+    parent.getReactChildAt(index)
+
+  override fun removeViewAt(parent: ExpoSmartRefreshLayoutView, index: Int) {
+    parent.removeReactChild(index)
+  }
+
+  override fun addEventEmitters(
+    reactContext: ThemedReactContext,
+    view: ExpoSmartRefreshLayoutView
+  ) {
+    fun emit(name: String, payload: com.facebook.react.bridge.WritableMap = Arguments.createMap()) {
+      UIManagerHelper.getEventDispatcherForReactTag(reactContext, view.id)?.dispatchEvent(
+        SmartRefreshEvent(UIManagerHelper.getSurfaceId(view), view.id, name, payload)
+      )
+    }
+
+    fun emitRequest(name: String, requestId: Int, source: String) {
+      emit(name, Arguments.createMap().apply {
+        putInt("requestId", requestId)
+        putString("source", source)
+      })
+    }
+
+    view.onRefresh = { requestId, source ->
+      emitRequest("topRefresh", requestId, source)
+    }
+    view.onLoadMore = { requestId, source ->
+      emitRequest("topLoadMore", requestId, source)
+    }
+    view.onStateChange = { state ->
+      emit("topStateChange", Arguments.createMap().apply { putString("state", state) })
+    }
+  }
+
+  override fun onDropViewInstance(view: ExpoSmartRefreshLayoutView) {
+    view.dispose()
+    view.onRefresh = null
+    view.onLoadMore = null
+    view.onStateChange = null
+    super.onDropViewInstance(view)
+  }
+
+  override fun setRefreshEnabled(view: ExpoSmartRefreshLayoutView, value: Boolean) = view.setRefreshEnabled(value)
+  override fun setLoadMoreEnabled(view: ExpoSmartRefreshLayoutView, value: Boolean) = view.setLoadMoreEnabled(value)
+  override fun setAutoLoadMoreEnabled(view: ExpoSmartRefreshLayoutView, value: Boolean) = view.setAutoLoadMoreEnabled(value)
+  override fun setRefreshing(view: ExpoSmartRefreshLayoutView, value: Boolean) = view.setRefreshing(value)
+  override fun setLoadingMore(view: ExpoSmartRefreshLayoutView, value: Boolean) = view.setLoadingMore(value)
+  override fun setNoMoreData(view: ExpoSmartRefreshLayoutView, value: Boolean) = view.setNoMoreData(value)
+  override fun setHapticsEnabled(view: ExpoSmartRefreshLayoutView, value: Boolean) = view.setHapticsEnabled(value)
+  override fun setHeaderStyle(view: ExpoSmartRefreshLayoutView, value: String?) = view.setHeaderStyle(value)
+  override fun setIndicatorColor(view: ExpoSmartRefreshLayoutView, value: Int?) = view.setIndicatorColor(value)
+  override fun setTitleColor(view: ExpoSmartRefreshLayoutView, value: Int?) = view.setTitleColor(value)
+  override fun setPullDownText(view: ExpoSmartRefreshLayoutView, value: String?) = view.setPullDownText(value)
+  override fun setReleaseToRefreshText(view: ExpoSmartRefreshLayoutView, value: String?) = view.setReleaseToRefreshText(value)
+  override fun setRefreshingText(view: ExpoSmartRefreshLayoutView, value: String?) = view.setRefreshingText(value)
+  override fun setRefreshCompleteText(view: ExpoSmartRefreshLayoutView, value: String?) = view.setRefreshCompleteText(value)
+  override fun setPullUpText(view: ExpoSmartRefreshLayoutView, value: String?) = view.setPullUpText(value)
+  override fun setReleaseToLoadMoreText(view: ExpoSmartRefreshLayoutView, value: String?) = view.setReleaseToLoadMoreText(value)
+  override fun setLoadingMoreText(view: ExpoSmartRefreshLayoutView, value: String?) = view.setLoadingMoreText(value)
+  override fun setNoMoreDataText(view: ExpoSmartRefreshLayoutView, value: String?) = view.setNoMoreDataText(value)
+  override fun beginRefresh(view: ExpoSmartRefreshLayoutView, requestId: Int, delayMs: Int) =
+    view.beginRefresh(requestId, delayMs)
+  override fun finishRefresh(
+    view: ExpoSmartRefreshLayoutView,
+    requestId: Int,
+    success: Boolean,
+    delayMs: Int
+  ) = view.finishRefresh(requestId, success, delayMs)
+  override fun beginLoadMore(view: ExpoSmartRefreshLayoutView, requestId: Int, delayMs: Int) =
+    view.beginLoadMore(requestId, delayMs)
+  override fun finishLoadMore(
+    view: ExpoSmartRefreshLayoutView,
+    requestId: Int,
+    success: Boolean,
+    noMoreData: Boolean,
+    delayMs: Int
+  ) = view.finishLoadMore(requestId, success, noMoreData, delayMs)
+  override fun resetNoMoreData(view: ExpoSmartRefreshLayoutView) = view.resetNoMoreData()
+
+  override fun getExportedCustomDirectEventTypeConstants(): MutableMap<String, Any> =
+    mutableMapOf(
+      "topRefresh" to mutableMapOf("registrationName" to "onRefresh"),
+      "topLoadMore" to mutableMapOf("registrationName" to "onLoadMore"),
+      "topStateChange" to mutableMapOf("registrationName" to "onStateChange")
+    )
+
+  companion object {
+    const val NAME = "ExpoSmartRefreshLayoutView"
+  }
+}
