@@ -49,4 +49,5 @@ dependencies {
   implementation "io.github.scwang90:refresh-header-classics:3.0.0-alpha"
   implementation "io.github.scwang90:refresh-header-material:3.0.0-alpha"
   implementation "io.github.scwang90:refresh-footer-classics:3.0.0-alpha"
+  implementation "io.github.scwang90:refresh-header-two-level:3.0.0-alpha"
 }

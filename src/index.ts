@@ -1,6 +1,8 @@
 export { SmartRefreshLayout } from './SmartRefreshLayout';
 export { SmartRefreshLayout as ExpoSmartrefreshlayoutView } from './SmartRefreshLayout';
+export { SmartSecondFloorLayout } from './SmartSecondFloorLayout';
 export type {
+  ClassicSpinnerStyle,
   FinishLoadMoreOptions,
   FinishRefreshOptions,
   LoadMoreMode,
@@ -11,3 +13,11 @@ export type {
   SmartRefreshLayoutProps,
   SmartRefreshLayoutRef,
 } from './SmartRefreshLayout.types';
+export type {
+  FinishSecondFloorRefreshOptions,
+  SecondFloorMessages,
+  SecondFloorRefreshRequest,
+  SecondFloorState,
+  SmartSecondFloorLayoutProps,
+  SmartSecondFloorLayoutRef,
+} from './SmartSecondFloorLayout.types';

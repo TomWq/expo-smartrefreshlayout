@@ -1,24 +1,31 @@
-import { useCallback, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Animated,
   FlatList,
+  Image,
+  Platform,
   Pressable,
   SafeAreaView,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Switch,
   Text,
   View,
 } from 'react-native';
-import { SmartRefreshLayout } from 'expo-smartrefreshlayout';
+import { SmartRefreshLayout, SmartSecondFloorLayout } from 'expo-smartrefreshlayout';
 import type {
-  LoadMoreMode,
+  ClassicSpinnerStyle,
   RefreshRequest,
   RefreshState,
+  SecondFloorState,
   SmartRefreshLayoutRef,
+  SmartSecondFloorLayoutRef,
 } from 'expo-smartrefreshlayout';
 
 const PAGE_SIZE = 15;
-const TOTAL_PAGES = 5;
+const TOTAL_PAGES = 4;
 
 type FeedItem = {
   id: string;
@@ -28,6 +35,28 @@ type FeedItem = {
 };
 
 const COLORS = ['#1677ff', '#13c2c2', '#52c41a', '#fa8c16', '#eb2f96'];
+
+type HeaderTheme = {
+  id: string;
+  label: string;
+  primary: string;
+  indicator: string;
+  title: string;
+};
+
+const CLASSIC_THEMES: HeaderTheme[] = [
+  { id: 'default', label: '默认', primary: '#00000000', indicator: '#666666', title: '#666666' },
+  { id: 'blue', label: '蓝色', primary: '#1677ff', indicator: '#ffffff', title: '#ffffff' },
+  { id: 'green', label: '绿色', primary: '#52c41a', indicator: '#ffffff', title: '#ffffff' },
+  { id: 'red', label: '红色', primary: '#f5222d', indicator: '#ffffff', title: '#ffffff' },
+  { id: 'orange', label: '橙色', primary: '#fa8c16', indicator: '#ffffff', title: '#ffffff' },
+];
+
+const MATERIAL_THEMES: HeaderTheme[] = CLASSIC_THEMES.slice(1);
+
+const TAOBAO_HOME_IMAGE = require('./assets/image_taobao.jpg');
+const TAOBAO_SECOND_FLOOR_BACKGROUND_IMAGE = require('./assets/image_second_floor.jpg');
+const TAOBAO_SECOND_FLOOR_CONTENT_IMAGE = require('./assets/image_second_floor_content.jpg');
 
 function createPage(page: number): FeedItem[] {
   const start = (page - 1) * PAGE_SIZE;
@@ -54,18 +83,99 @@ function requestSourceLabel(request: RefreshRequest): string {
   return request.source === 'programmatic' ? '主动调用' : '手势';
 }
 
-export default function App() {
+function ThemePicker({
+  themes,
+  selectedId,
+  onSelect,
+}: {
+  themes: HeaderTheme[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+}) {
+  const selectedTheme = themes.find((theme) => theme.id === selectedId) ?? themes[0];
+
+  return (
+    <View style={styles.themeRow}>
+      <Text style={styles.optionLabel}>主题</Text>
+      <View style={styles.swatchGroup}>
+        {themes.map((theme) => (
+          <Pressable
+            key={theme.id}
+            accessibilityRole="button"
+            accessibilityLabel={`使用${theme.label}主题`}
+            style={[
+              styles.swatchButton,
+              selectedId === theme.id && styles.swatchButtonActive,
+            ]}
+            onPress={() => onSelect(theme.id)}
+          >
+            <View style={[styles.swatch, { backgroundColor: theme.primary }]} />
+          </Pressable>
+        ))}
+      </View>
+      <Text style={styles.themeName}>{selectedTheme.label}</Text>
+    </View>
+  );
+}
+
+type RefreshPreviewProps = {
+  title: string;
+  subtitle: string;
+  headerStyle: 'classic' | 'material';
+  primaryColor: string;
+  indicatorColor: string;
+  titleColor: string;
+  classicSpinnerStyle?: ClassicSpinnerStyle;
+  classicEnableLastTime?: boolean;
+  materialShowBezierWave?: boolean;
+  materialEnableHeaderTranslationContent?: boolean;
+  materialProgressBackgroundColor?: string;
+  loadMoreEnabled: boolean;
+  controls: ReactNode;
+};
+
+function RefreshPreview({
+  title,
+  subtitle,
+  headerStyle,
+  primaryColor,
+  indicatorColor,
+  titleColor,
+  classicSpinnerStyle,
+  classicEnableLastTime,
+  materialShowBezierWave,
+  materialEnableHeaderTranslationContent,
+  materialProgressBackgroundColor,
+  loadMoreEnabled,
+  controls,
+}: RefreshPreviewProps) {
   const refreshRef = useRef<SmartRefreshLayoutRef>(null);
   const pageRef = useRef(1);
   const failNextRequestRef = useRef(false);
 
   const [items, setItems] = useState<FeedItem[]>(() => createPage(1));
   const [hasMore, setHasMore] = useState(true);
-  const [loadMoreMode, setLoadMoreMode] = useState<LoadMoreMode>('pull');
-  const [headerStyle, setHeaderStyle] = useState<'classic' | 'material'>('classic');
   const [failNextRequest, setFailNextRequest] = useState(false);
   const [nativeState, setNativeState] = useState<RefreshState>('idle');
-  const [notice, setNotice] = useState('准备就绪：先试试下拉刷新或上拉加载');
+  const [notice, setNotice] = useState('准备就绪：下拉刷新可立即查看当前配置');
+  const configurationRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    configurationRefreshTimerRef.current = setTimeout(() => {
+      configurationRefreshTimerRef.current = null;
+      const accepted = refreshRef.current?.beginRefresh(120) === true;
+      if (!accepted) {
+        setNotice('预览尚未就绪，等待当前原生操作结束');
+      }
+    }, 220);
+
+    return () => {
+      if (configurationRefreshTimerRef.current !== null) {
+        clearTimeout(configurationRefreshTimerRef.current);
+        configurationRefreshTimerRef.current = null;
+      }
+    };
+  }, []);
 
   const consumeFailureSwitch = useCallback(() => {
     const shouldFail = failNextRequestRef.current;
@@ -129,8 +239,8 @@ export default function App() {
     setItems(createPage(1));
     setHasMore(true);
     refreshRef.current?.resetNoMoreData();
-    setNotice('分页已重置 · 当前为第 1 页');
-  }, []);
+    setNotice(loadMoreEnabled ? '分页已重置 · 当前为第 1 页' : '测试列表已重置');
+  }, [loadMoreEnabled]);
 
   const toggleFailure = useCallback((value: boolean) => {
     failNextRequestRef.current = value;
@@ -139,14 +249,12 @@ export default function App() {
   }, []);
 
   return (
-    <SafeAreaView style={styles.screen}>
-      <StatusBar barStyle="dark-content" />
-
+    <View style={styles.preview}>
       <View style={styles.toolbar}>
         <View style={styles.headingRow}>
           <View style={styles.headingCopy}>
-            <Text style={styles.title}>SmartRefreshLayout</Text>
-            <Text style={styles.subtitle}>Fabric + Codegen 真机验证页</Text>
+            <Text style={styles.title}>{title}</Text>
+            <Text style={styles.subtitle}>{subtitle}</Text>
           </View>
           <View style={styles.countBadge}>
             <Text style={styles.countValue}>{items.length}</Text>
@@ -154,12 +262,16 @@ export default function App() {
           </View>
         </View>
 
+        <View style={styles.configurationBand}>{controls}</View>
+
         <View style={styles.actionRow}>
           <Pressable style={styles.primaryButton} onPress={handleProgrammaticRefresh}>
             <Text style={styles.primaryButtonText}>主动刷新</Text>
           </Pressable>
           <Pressable style={styles.secondaryButton} onPress={resetPagination}>
-            <Text style={styles.secondaryButtonText}>重置分页</Text>
+            <Text style={styles.secondaryButtonText}>
+              {loadMoreEnabled ? '重置分页' : '重置列表'}
+            </Text>
           </Pressable>
           <View style={styles.failureSwitch}>
             <Text style={styles.switchLabel}>下次失败</Text>
@@ -169,47 +281,6 @@ export default function App() {
               trackColor={{ false: '#d9d9d9', true: '#ff7875' }}
               thumbColor="#ffffff"
             />
-          </View>
-        </View>
-
-        <View style={styles.optionRow}>
-          <Text style={styles.optionLabel}>分页触发</Text>
-          <View style={styles.segmentedControl}>
-            <Pressable
-              style={[styles.segment, loadMoreMode === 'pull' && styles.segmentActive]}
-              onPress={() => setLoadMoreMode('pull')}
-            >
-              <Text style={[styles.segmentText, loadMoreMode === 'pull' && styles.segmentTextActive]}>
-                上拉释放
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[styles.segment, loadMoreMode === 'auto' && styles.segmentActive]}
-              onPress={() => setLoadMoreMode('auto')}
-            >
-              <Text style={[styles.segmentText, loadMoreMode === 'auto' && styles.segmentTextActive]}>
-                滚动到底
-              </Text>
-            </Pressable>
-          </View>
-          <Text style={styles.optionLabel}>Header</Text>
-          <View style={styles.segmentedControlSmall}>
-            <Pressable
-              style={[styles.segment, headerStyle === 'classic' && styles.segmentActive]}
-              onPress={() => setHeaderStyle('classic')}
-            >
-              <Text style={[styles.segmentText, headerStyle === 'classic' && styles.segmentTextActive]}>
-                Classic
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[styles.segment, headerStyle === 'material' && styles.segmentActive]}
-              onPress={() => setHeaderStyle('material')}
-            >
-              <Text style={[styles.segmentText, headerStyle === 'material' && styles.segmentTextActive]}>
-                Material
-              </Text>
-            </Pressable>
           </View>
         </View>
 
@@ -225,12 +296,19 @@ export default function App() {
       <SmartRefreshLayout
         ref={refreshRef}
         style={styles.refreshLayout}
-        loadMoreMode={loadMoreMode}
+        loadMoreMode="auto"
+        loadMoreEnabled={loadMoreEnabled}
         hasMore={hasMore}
         headerStyle={headerStyle}
         hapticsEnabled
-        indicatorColor="#1677ff"
-        titleColor="#595959"
+        primaryColor={primaryColor}
+        indicatorColor={indicatorColor}
+        titleColor={titleColor}
+        classicSpinnerStyle={classicSpinnerStyle}
+        classicEnableLastTime={classicEnableLastTime}
+        materialShowBezierWave={materialShowBezierWave}
+        materialEnableHeaderTranslationContent={materialEnableHeaderTranslationContent}
+        materialProgressBackgroundColor={materialProgressBackgroundColor}
         messages={{
           pullDown: '下拉刷新',
           releaseToRefresh: '松开刷新',
@@ -242,7 +320,7 @@ export default function App() {
           noMoreData: '没有更多数据了',
         }}
         onRefresh={refresh}
-        onLoadMore={loadMore}
+        onLoadMore={loadMoreEnabled ? loadMore : undefined}
         onRefreshError={(error) => setNotice(`刷新失败 · ${getErrorMessage(error)}`)}
         onLoadMoreError={(error) => setNotice(`分页失败 · ${getErrorMessage(error)}`)}
         onStateChange={setNativeState}
@@ -263,21 +341,308 @@ export default function App() {
           )}
           ListHeaderComponent={
             <View style={styles.listHeader}>
-              <Text style={styles.listHeaderTitle}>可滚动测试列表</Text>
+              <Text style={styles.listHeaderTitle}>{title} 官方配置预览</Text>
               <Text style={styles.listHeaderText}>
-                不使用 FlatList.onEndReached，分页完全由 SmartRefreshLayout 负责。
+                {loadMoreEnabled
+                  ? '该页保留官方 Classic 示例的上拉加载能力，不使用 FlatList.onEndReached。'
+                  : '该页对应官方 Material 示例：只保留下拉刷新，不启用加载更多。'}
               </Text>
             </View>
           }
           ListFooterComponent={
             <View style={styles.listFooter}>
               <Text style={styles.listFooterText}>
-                {hasMore ? '继续向上滚动，或上拉释放触发下一页' : '已加载全部模拟数据，可点击“重置分页”'}
+                {loadMoreEnabled
+                  ? hasMore
+                    ? '继续向上滚动并释放，触发下一页'
+                    : '已加载全部模拟数据，可点击“重置分页”'
+                  : 'Material 官方页未启用加载更多'}
               </Text>
             </View>
           }
         />
       </SmartRefreshLayout>
+    </View>
+  );
+}
+
+function SecondFloorDemoPage() {
+  if (Platform.OS !== 'android') {
+    return (
+      <View style={styles.androidOnlyNotice}>
+        <Text style={styles.androidOnlyTitle}>淘宝二楼仅支持 Android</Text>
+        <Text style={styles.androidOnlyText}>
+          iOS 继续使用 Classic 或 Material 下拉刷新，不挂载二楼原生组件。
+        </Text>
+      </View>
+    );
+  }
+
+  return <AndroidSecondFloorDemoPage />;
+}
+
+function AndroidSecondFloorDemoPage() {
+  const layoutRef = useRef<SmartSecondFloorLayoutRef>(null);
+  const toolbarOpacity = useRef(new Animated.Value(1)).current;
+  const [toolbarInteractive, setToolbarInteractive] = useState(true);
+
+  const animateToolbar = useCallback(
+    (toValue: number, duration: number) => {
+      toolbarOpacity.stopAnimation();
+      Animated.timing(toolbarOpacity, {
+        toValue,
+        duration,
+        useNativeDriver: true,
+      }).start();
+    },
+    [toolbarOpacity]
+  );
+
+  useEffect(() => () => toolbarOpacity.stopAnimation(), [toolbarOpacity]);
+  const handleStateChange = useCallback(
+    (state: SecondFloorState) => {
+      if (state === 'second-floor-closing') {
+        animateToolbar(1, 260);
+        return;
+      }
+
+      const floorIsVisible =
+        state === 'release-to-second-floor' ||
+        state === 'second-floor-opening' ||
+        state === 'second-floor';
+      setToolbarInteractive(!floorIsVisible);
+      animateToolbar(floorIsVisible ? 0 : 1, floorIsVisible ? 180 : 160);
+    },
+    [animateToolbar]
+  );
+
+  const openSecondFloor = useCallback(() => {
+    layoutRef.current?.openSecondFloor();
+  }, []);
+
+  const refresh = useCallback(async () => {
+    await wait(900);
+  }, []);
+
+  return (
+    <View style={styles.taobaoPage}>
+      <SmartSecondFloorLayout
+        ref={layoutRef}
+        style={styles.refreshLayout}
+        secondFloorBackground={
+          <Image
+            source={TAOBAO_SECOND_FLOOR_BACKGROUND_IMAGE}
+            style={styles.taobaoFloorImage}
+            resizeMode="cover"
+          />
+        }
+        secondFloor={
+          <Image
+            source={TAOBAO_SECOND_FLOOR_CONTENT_IMAGE}
+            style={styles.taobaoFloorImage}
+            resizeMode="cover"
+          />
+        }
+        hapticsEnabled
+        headerInset={56}
+        primaryColor="transparent"
+        indicatorColor="#ffffff"
+        titleColor="#ffffff"
+        classicEnableLastTime
+        messages={{
+          pullDown: '下拉刷新',
+          releaseToRefresh: '释放刷新',
+          refreshing: '正在刷新',
+          refreshComplete: '刷新完成',
+        }}
+        onRefresh={refresh}
+        onStateChange={handleStateChange}
+      >
+        <ScrollView
+          style={styles.taobaoScroll}
+          contentContainerStyle={styles.taobaoContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <Image source={TAOBAO_HOME_IMAGE} style={styles.taobaoHomeImage} resizeMode="cover" />
+        </ScrollView>
+      </SmartSecondFloorLayout>
+      <Animated.View
+        pointerEvents={toolbarInteractive ? 'auto' : 'none'}
+        style={[styles.taobaoToolbar, { opacity: toolbarOpacity }]}
+      >
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="打开淘宝二楼"
+          style={styles.taobaoToolbarButton}
+          onPress={openSecondFloor}
+        >
+          <Text style={styles.taobaoToolbarTitle}>淘宝二楼</Text>
+        </Pressable>
+      </Animated.View>
+    </View>
+  );
+}
+
+function ClassicConfigurationPage() {
+  const [spinnerStyle, setSpinnerStyle] = useState<ClassicSpinnerStyle>('fixed-behind');
+  const [enableLastTime, setEnableLastTime] = useState(true);
+  const [themeId, setThemeId] = useState('default');
+  const theme = CLASSIC_THEMES.find((item) => item.id === themeId) ?? CLASSIC_THEMES[0];
+
+  return (
+    <RefreshPreview
+      title="Classic 配置"
+      subtitle="ClassicsHeader：Spinner、最后更新时间与主题色"
+      headerStyle="classic"
+      primaryColor={theme.primary}
+      indicatorColor={theme.indicator}
+      titleColor={theme.title}
+      classicSpinnerStyle={spinnerStyle}
+      classicEnableLastTime={enableLastTime}
+      loadMoreEnabled
+      controls={
+        <>
+          <View style={styles.optionRow}>
+            <Text style={styles.optionLabel}>Spinner</Text>
+            <View style={styles.segmentedControl}>
+              {[
+                ['scale', '拉伸'],
+                ['translate', '平移'],
+                ['fixed-behind', '固定背后'],
+              ].map(([value, label]) => (
+                <Pressable
+                  key={value}
+                  style={[
+                    styles.segment,
+                    spinnerStyle === value && styles.segmentActive,
+                  ]}
+                  onPress={() => setSpinnerStyle(value as ClassicSpinnerStyle)}
+                >
+                  <Text
+                    style={[
+                      styles.segmentText,
+                      spinnerStyle === value && styles.segmentTextActive,
+                    ]}
+                  >
+                    {label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+          <View style={styles.switchRow}>
+            <Text style={styles.optionLabel}>显示最后更新时间</Text>
+            <Switch
+              value={enableLastTime}
+              onValueChange={setEnableLastTime}
+              trackColor={{ false: '#d9d9d9', true: '#91caff' }}
+              thumbColor="#ffffff"
+            />
+          </View>
+          <ThemePicker
+            themes={CLASSIC_THEMES}
+            selectedId={themeId}
+            onSelect={setThemeId}
+          />
+        </>
+      }
+    />
+  );
+}
+
+function MaterialConfigurationPage() {
+  const [showBezierWave, setShowBezierWave] = useState(false);
+  const [translateContent, setTranslateContent] = useState(false);
+  const [themeId, setThemeId] = useState('blue');
+  const theme = MATERIAL_THEMES.find((item) => item.id === themeId) ?? MATERIAL_THEMES[0];
+
+  return (
+    <RefreshPreview
+      title="Material 配置"
+      subtitle="MaterialHeader：贝塞尔背景、内容偏移与进度圆主题"
+      headerStyle="material"
+      primaryColor={theme.primary}
+      indicatorColor={theme.indicator}
+      titleColor={theme.title}
+      materialShowBezierWave={showBezierWave}
+      materialEnableHeaderTranslationContent={translateContent}
+      materialProgressBackgroundColor={theme.primary}
+      loadMoreEnabled={false}
+      controls={
+        <>
+          <View style={styles.switchRow}>
+            <Text style={styles.optionLabel}>显示贝塞尔背景</Text>
+            <Switch
+              value={showBezierWave}
+              onValueChange={setShowBezierWave}
+              trackColor={{ false: '#d9d9d9', true: '#91caff' }}
+              thumbColor="#ffffff"
+            />
+          </View>
+          <View style={styles.switchRow}>
+            <Text style={styles.optionLabel}>内容跟随 Header 偏移</Text>
+            <Switch
+              value={translateContent}
+              onValueChange={setTranslateContent}
+              trackColor={{ false: '#d9d9d9', true: '#91caff' }}
+              thumbColor="#ffffff"
+            />
+          </View>
+          <ThemePicker
+            themes={MATERIAL_THEMES}
+            selectedId={themeId}
+            onSelect={setThemeId}
+          />
+        </>
+      }
+    />
+  );
+}
+
+export default function App() {
+  const [page, setPage] = useState<'classic' | 'material' | 'second-floor'>('classic');
+
+  return (
+    <SafeAreaView style={styles.screen}>
+      <StatusBar barStyle="dark-content" />
+      <View style={styles.pageTabs}>
+        <Text style={styles.appTitle}>SmartRefreshLayout</Text>
+        <View style={styles.pageTabControl}>
+          <Pressable
+            style={[styles.pageTab, page === 'classic' && styles.pageTabActive]}
+            onPress={() => setPage('classic')}
+          >
+            <Text style={[styles.pageTabText, page === 'classic' && styles.pageTabTextActive]}>
+              Classic
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.pageTab, page === 'material' && styles.pageTabActive]}
+            onPress={() => setPage('material')}
+          >
+            <Text style={[styles.pageTabText, page === 'material' && styles.pageTabTextActive]}>
+              Material
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.pageTab, page === 'second-floor' && styles.pageTabActive]}
+            onPress={() => setPage('second-floor')}
+          >
+            <Text
+              style={[styles.pageTabText, page === 'second-floor' && styles.pageTabTextActive]}
+            >
+              二楼
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+      {page === 'classic' ? (
+        <ClassicConfigurationPage />
+      ) : page === 'material' ? (
+        <MaterialConfigurationPage />
+      ) : (
+        <SecondFloorDemoPage />
+      )}
     </SafeAreaView>
   );
 }
@@ -286,6 +651,57 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: '#f5f7fa',
+  },
+  preview: {
+    flex: 1,
+  },
+  pageTabs: {
+
+    paddingHorizontal: 16,
+    paddingTop:32,
+    paddingBlock:12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#ffffff',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#d9d9d9',
+  },
+  appTitle: {
+    flexShrink: 1,
+    maxWidth: '42%',
+    color: '#1f1f1f',
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  pageTabControl: {
+    flex: 1,
+    marginLeft: 12,
+    flexDirection: 'row',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#d9d9d9',
+    borderRadius: 5,
+    overflow: 'hidden',
+  },
+  pageTab: {
+    flex: 1,
+    minWidth: 0,
+    paddingHorizontal: 8,
+    minHeight: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+  },
+  pageTabActive: {
+    backgroundColor: '#e6f4ff',
+  },
+  pageTabText: {
+    color: '#8c8c8c',
+    fontSize: 12,
+  },
+  pageTabTextActive: {
+    color: '#0958d9',
+    fontWeight: '600',
   },
   toolbar: {
     paddingHorizontal: 16,
@@ -312,6 +728,9 @@ const styles = StyleSheet.create({
     marginTop: 3,
     color: '#8c8c8c',
     fontSize: 12,
+  },
+  configurationBand: {
+    marginTop: 10,
   },
   countBadge: {
     minWidth: 54,
@@ -375,19 +794,47 @@ const styles = StyleSheet.create({
     marginTop: 10,
     gap: 7,
   },
+  switchRow: {
+    minHeight: 34,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   optionLabel: {
     color: '#8c8c8c',
     fontSize: 11,
   },
-  segmentedControl: {
+  themeRow: {
+    minHeight: 32,
     flexDirection: 'row',
-    flex: 1,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#d9d9d9',
-    borderRadius: 5,
-    overflow: 'hidden',
+    alignItems: 'center',
   },
-  segmentedControlSmall: {
+  swatchGroup: {
+    flexDirection: 'row',
+    marginLeft: 10,
+  },
+  swatchButton: {
+    width: 26,
+    height: 26,
+    marginRight: 7,
+    padding: 3,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'transparent',
+    borderRadius: 4,
+  },
+  swatchButtonActive: {
+    borderColor: '#1677ff',
+  },
+  swatch: {
+    flex: 1,
+    borderRadius: 2,
+  },
+  themeName: {
+    marginLeft: 'auto',
+    color: '#595959',
+    fontSize: 12,
+  },
+  segmentedControl: {
     flexDirection: 'row',
     flex: 1,
     borderWidth: StyleSheet.hairlineWidth,
@@ -501,6 +948,64 @@ const styles = StyleSheet.create({
   listFooterText: {
     color: '#8c8c8c',
     fontSize: 12,
+    textAlign: 'center',
+  },
+  taobaoPage: {
+    flex: 1,
+  },
+  taobaoScroll: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  taobaoContent: {
+    paddingTop: 56,
+  },
+  taobaoHomeImage: {
+    width: '100%',
+    aspectRatio: 400 / 1073,
+  },
+  taobaoFloorImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+  },
+  taobaoToolbar: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    left: 0,
+    height: 56,
+    backgroundColor: '#fe1200',
+    elevation: 2,
+    zIndex: 2,
+  },
+  taobaoToolbarButton: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  taobaoToolbarTitle: {
+    color: '#ffffff',
+    fontSize: 19,
+    fontWeight: '700',
+  },
+  androidOnlyNotice: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 24,
+    backgroundColor: '#ffffff',
+  },
+  androidOnlyTitle: {
+    color: '#262626',
+    fontSize: 20,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  androidOnlyText: {
+    marginTop: 10,
+    color: '#8c8c8c',
+    fontSize: 13,
+    lineHeight: 20,
     textAlign: 'center',
   },
 });

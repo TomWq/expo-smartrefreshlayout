@@ -6,6 +6,8 @@ import type { RequestSource } from './NativeSmartRefreshLayout';
 
 export type RefreshState = NativeRefreshState;
 export type LoadMoreMode = 'pull' | 'auto';
+/** Classic header motion modes supported on Android and iOS. */
+export type ClassicSpinnerStyle = 'scale' | 'translate' | 'fixed-behind';
 
 export interface RefreshRequest {
   requestId: number;
@@ -39,8 +41,23 @@ export interface SmartRefreshLayoutProps extends ViewProps {
   hasMore?: boolean;
   hapticsEnabled?: boolean;
   headerStyle?: 'classic' | 'material';
+  /** Primary color for the Classic header/footer and Android Material header. */
+  primaryColor?: ColorValue;
   indicatorColor?: ColorValue;
   titleColor?: ColorValue;
+  /** Classic header motion: scale, translate, or fixed behind the content. */
+  classicSpinnerStyle?: ClassicSpinnerStyle;
+  /** Controls the last-refresh-time label on Classic headers. */
+  classicEnableLastTime?: boolean;
+  /** Android only. Maps to MaterialHeader.setShowBezierWave. */
+  materialShowBezierWave?: boolean;
+  /**
+   * Android only. Controls whether content moves with a Material header.
+   * It maps to SmartRefreshLayout.setEnableHeaderTranslationContent.
+   */
+  materialEnableHeaderTranslationContent?: boolean;
+  /** Material progress indicator background color. */
+  materialProgressBackgroundColor?: ColorValue;
   messages?: Partial<RefreshMessages>;
   onRefresh?: (request: RefreshRequest) => void | Promise<void>;
   onLoadMore?: (

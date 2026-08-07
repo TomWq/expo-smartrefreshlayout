@@ -279,3 +279,157 @@ it('only exposes auto loading as an explicit mode and does not trigger it on mou
   expect(nativeView.props.autoLoadMoreEnabled).toBe(true);
   expect(onLoadMore).not.toHaveBeenCalled();
 });
+
+it('forwards the official Classic header configuration to the native component', async () => {
+  const renderer = await renderLayout({
+    headerStyle: 'classic',
+    primaryColor: '#1677ff',
+    indicatorColor: '#ffffff',
+    titleColor: '#ffffff',
+    classicSpinnerStyle: 'fixed-behind',
+    classicEnableLastTime: false,
+  });
+  const nativeView = renderer.root.findByType(NativeSmartRefreshLayout);
+
+  expect(nativeView.props).toEqual(
+    expect.objectContaining({
+      headerStyle: 'classic',
+      primaryColor: '#1677ff',
+      indicatorColor: '#ffffff',
+      titleColor: '#ffffff',
+      classicSpinnerStyle: 'fixed-behind',
+      classicEnableLastTime: false,
+    })
+  );
+});
+
+it('preserves the transparent FixedBehind Classic configuration used by the official sample', async () => {
+  const renderer = await renderLayout({
+    headerStyle: 'classic',
+    primaryColor: '#00000000',
+    indicatorColor: '#666666',
+    titleColor: '#666666',
+    classicSpinnerStyle: 'fixed-behind',
+    classicEnableLastTime: true,
+  });
+  const nativeView = renderer.root.findByType(NativeSmartRefreshLayout);
+
+  expect(nativeView.props).toEqual(
+    expect.objectContaining({
+      primaryColor: '#00000000',
+      indicatorColor: '#666666',
+      titleColor: '#666666',
+      classicSpinnerStyle: 'fixed-behind',
+      classicEnableLastTime: true,
+    })
+  );
+});
+
+it('forwards dynamic Classic spinner style changes in every supported mode', async () => {
+  const renderer = await renderLayout({
+    headerStyle: 'classic',
+    classicSpinnerStyle: 'fixed-behind',
+  });
+
+  const updateSpinnerStyle = async (
+    classicSpinnerStyle: 'scale' | 'translate' | 'fixed-behind'
+  ) => {
+    await act(async () => {
+      renderer.update(
+        <SmartRefreshLayout
+          headerStyle="classic"
+          classicSpinnerStyle={classicSpinnerStyle}
+        >
+          <ScrollContent />
+        </SmartRefreshLayout>
+      );
+    });
+    expect(
+      renderer.root.findByType(NativeSmartRefreshLayout).props.classicSpinnerStyle
+    ).toBe(classicSpinnerStyle);
+  };
+
+  await updateSpinnerStyle('scale');
+  await updateSpinnerStyle('translate');
+  await updateSpinnerStyle('fixed-behind');
+});
+
+it('keeps the final Classic configuration through rapid header family changes', async () => {
+  const renderer = await renderLayout({
+    headerStyle: 'classic',
+    classicSpinnerStyle: 'translate',
+  });
+
+  await act(async () => {
+    renderer.update(
+      <SmartRefreshLayout
+        headerStyle="material"
+        materialShowBezierWave
+        materialEnableHeaderTranslationContent
+      >
+        <ScrollContent />
+      </SmartRefreshLayout>
+    );
+  });
+  expect(renderer.root.findByType(NativeSmartRefreshLayout).props.headerStyle).toBe(
+    'material'
+  );
+
+  await act(async () => {
+    renderer.update(
+      <SmartRefreshLayout
+        headerStyle="classic"
+        classicSpinnerStyle="scale"
+        classicEnableLastTime={false}
+      >
+        <ScrollContent />
+      </SmartRefreshLayout>
+    );
+  });
+  expect(
+    renderer.root.findByType(NativeSmartRefreshLayout).props.classicSpinnerStyle
+  ).toBe('scale');
+
+  await act(async () => {
+    renderer.update(
+      <SmartRefreshLayout
+        headerStyle="classic"
+        classicSpinnerStyle="fixed-behind"
+        classicEnableLastTime
+      >
+        <ScrollContent />
+      </SmartRefreshLayout>
+    );
+  });
+
+  expect(renderer.root.findByType(NativeSmartRefreshLayout).props).toEqual(
+    expect.objectContaining({
+      headerStyle: 'classic',
+      classicSpinnerStyle: 'fixed-behind',
+      classicEnableLastTime: true,
+    })
+  );
+});
+
+it('forwards the official Material header configuration to the native component', async () => {
+  const renderer = await renderLayout({
+    headerStyle: 'material',
+    primaryColor: '#52c41a',
+    indicatorColor: '#ffffff',
+    materialShowBezierWave: true,
+    materialEnableHeaderTranslationContent: true,
+    materialProgressBackgroundColor: '#52c41a',
+  });
+  const nativeView = renderer.root.findByType(NativeSmartRefreshLayout);
+
+  expect(nativeView.props).toEqual(
+    expect.objectContaining({
+      headerStyle: 'material',
+      primaryColor: '#52c41a',
+      indicatorColor: '#ffffff',
+      materialShowBezierWave: true,
+      materialEnableHeaderTranslationContent: true,
+      materialProgressBackgroundColor: '#52c41a',
+    })
+  );
+});

@@ -22,8 +22,14 @@ import { SmartRefreshLayout } from 'expo-smartrefreshlayout';
 | `hasMore` | `boolean` | `true` | `false` 时显示没有更多数据并禁止继续加载 |
 | `hapticsEnabled` | `boolean` | `true` | 到达释放阈值时启用触觉反馈 |
 | `headerStyle` | `'classic' \| 'material'` | `'classic'` | 刷新头样式 |
+| `primaryColor` | `ColorValue` | 平台默认 | Android 专属；当前 Header 与 Classic footer 的主背景色 |
 | `indicatorColor` | `ColorValue` | 平台默认 | 指示器颜色 |
 | `titleColor` | `ColorValue` | 平台默认 | 状态文字颜色 |
+| `classicSpinnerStyle` | `'scale' \| 'translate' \| 'fixed-behind'` | `'translate'` | Android 专属；对应 `ClassicsHeader.setSpinnerStyle` |
+| `classicEnableLastTime` | `boolean` | `true` | Android 专属；显示或隐藏 Classic 的最后更新时间 |
+| `materialShowBezierWave` | `boolean` | `false` | Android 专属；对应 `MaterialHeader.setShowBezierWave` |
+| `materialEnableHeaderTranslationContent` | `boolean` | `false` | Android 专属；Material Header 下拉时内容是否同步偏移 |
+| `materialProgressBackgroundColor` | `ColorValue` | Material 默认 | Android 专属；Material 进度圆背景色 |
 | `messages` | `Partial<RefreshMessages>` | 英文默认文案 | 覆盖状态文案 |
 | `onRefresh` | `(request) => void \| Promise<void>` | - | 下拉刷新回调，参数含 `requestId` 和 `source` |
 | `onLoadMore` | `(request) => void \| { hasMore } \| Promise<...>` | - | 加载更多回调，可直接返回下一页是否还有数据 |
@@ -32,6 +38,46 @@ import { SmartRefreshLayout } from 'expo-smartrefreshlayout';
 | `onStateChange` | `(state: RefreshState) => void` | - | 原生刷新状态变化 |
 
 其余 `ViewProps` 会传给原生容器。
+
+### Android Classic 与 Material 配置
+
+这些 Props 对照官方 `ClassicsStyleActivity` 和 `MaterialStyleActivity`。它们只影响
+Android，iOS 会忽略但仍可安全传入。
+
+```tsx
+<SmartRefreshLayout
+  headerStyle="classic"
+  primaryColor="#1677ff"
+  indicatorColor="#ffffff"
+  titleColor="#ffffff"
+  classicSpinnerStyle="fixed-behind"
+  classicEnableLastTime
+  onRefresh={reload}
+>
+  <FlatList {...listProps} />
+</SmartRefreshLayout>
+```
+
+```tsx
+<SmartRefreshLayout
+  headerStyle="material"
+  primaryColor="#52c41a"
+  indicatorColor="#ffffff"
+  materialShowBezierWave
+  materialEnableHeaderTranslationContent={false}
+  materialProgressBackgroundColor="#52c41a"
+  onRefresh={reload}
+>
+  <FlatList {...listProps} />
+</SmartRefreshLayout>
+```
+
+`indicatorColor` 在 Material 模式中映射到官方 `setColorSchemeColors`；在 Classic
+模式中用于箭头与加载指示器。`titleColor` 只影响 Classic Header/Footer 文案。
+
+这些配置可以在组件运行期间动态更新。Classic Spinner 样式会强制重建 Header 以确保
+`scale`、`translate` 和 `fixed-behind` 真正切换；如果当前正在刷新或分页，变更会等到
+布局回到空闲状态后应用。
 
 ### Promise 行为
 
@@ -149,3 +195,91 @@ import { ExpoSmartrefreshlayoutView } from 'expo-smartrefreshlayout';
 ```
 
 别名使用的仍是 v2 Props。旧的 `ExpoSmartrefreshlayoutModule`、旧 Props 和自定义 Header API 不再存在。
+
+## SmartSecondFloorLayout（仅 Android）
+
+```tsx
+import { SmartSecondFloorLayout } from 'expo-smartrefreshlayout';
+```
+
+这是 Android-only 组件，底层使用 SmartRefreshLayout 的 `TwoLevelHeader`。`children` 必须是
+普通页面的唯一滚动子组件，`secondFloor` 是覆盖式二楼内容。可选的
+`secondFloorBackground` 用于在其后放置揭露式背景，并让正式二楼内容在进入后原生淡入。二楼组件不包含 footer，也不支持
+`onLoadMore` 或自动加载更多。iOS 没有等价原生能力，渲染该组件会抛出明确错误：请在
+平台分支中不要挂载它，或继续使用跨平台的 `SmartRefreshLayout`。
+
+### Props
+
+| 属性 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `children` | `ReactElement` | 必填 | 普通页面的唯一滚动子组件 |
+| `secondFloor` | `ReactElement` | 必填 | 二楼的全屏内容；可放 `ScrollView`/`FlatList` |
+| `secondFloorBackground` | `ReactElement` | - | `secondFloor` 后方的揭露背景；提供后正式内容会在打开时淡入 |
+| `refreshEnabled` | `boolean` | 是否提供 `onRefresh` | 是否允许普通下拉刷新 |
+| `refreshing` | `boolean` | 非受控 | 受控普通刷新状态 |
+| `hapticsEnabled` | `boolean` | `true` | 到达刷新或二楼释放阈值时触觉反馈 |
+| `secondFloorEnabled` | `boolean` | `true` | 是否允许进入二楼 |
+| `headerInset` | `number` | `0` | Classic Header 顶部预留的逻辑高度。页面顶部有覆盖式 Toolbar 时传入其高度，使 Header 的可见位置与二楼阈值一起计算 |
+| `maxRate` | `number` | `2.5` | 最大拖拽倍率，归一化到 `1.2..5` |
+| `floorRate` | `number` | `1.9` | 二楼释放倍率，至少 `1.1`，且低于 `maxRate` |
+| `refreshRate` | `number` | `1` | 普通刷新倍率，至少 `0.25`，且低于 `floorRate` |
+| `floorDuration` | `number` | `1000` | 进入/停留二楼的动画时长（毫秒），归一化到 `0..10000` |
+| `pullToCloseEnabled` | `boolean` | `true` | 是否允许在二楼向下拉关闭 |
+| `bottomPullUpToCloseRate` | `number` | `1/6` | 二楼底部关闭拖拽倍率，归一化到 `0.01..0.5` |
+| `primaryColor` | `ColorValue` | 平台默认 | Classic Header 背景色 |
+| `indicatorColor` | `ColorValue` | 平台默认 | Classic 指示器颜色 |
+| `titleColor` | `ColorValue` | 平台默认 | Classic 文案颜色 |
+| `classicEnableLastTime` | `boolean` | `true` | 是否显示 Classic 最后更新时间 |
+| `messages` | `Partial<SecondFloorMessages>` | 英文默认文案 | 覆盖普通刷新文案 |
+| `onRefresh` | `(request) => void \| Promise<void>` | - | 普通下拉刷新回调 |
+| `onRefreshError` | `(error: unknown) => void` | - | 刷新失败通知 |
+| `onStateChange` | `(state: SecondFloorState) => void` | - | 普通刷新和二楼生命周期状态 |
+| `onSecondFloorOpen` | `() => void` | - | 二楼展开动画完成 |
+| `onSecondFloorClose` | `() => void` | - | 二楼关闭动画完成 |
+
+`floorRate`、`maxRate` 和 `refreshRate` 会在 JS 与 Android 两端同时归一化。为了保持阈值
+顺序，传入互相矛盾的值时，组件会把较低层级压到上限，而不是抛异常。
+
+### SecondFloorMessages
+
+```ts
+interface SecondFloorMessages {
+  pullDown: string;
+  releaseToRefresh: string;
+  refreshing: string;
+  refreshComplete: string;
+}
+```
+
+### SecondFloorState
+
+```ts
+type SecondFloorState =
+  | 'idle'
+  | 'pulling'
+  | 'ready'
+  | 'refreshing'
+  | 'release-to-second-floor'
+  | 'second-floor-opening'
+  | 'second-floor'
+  | 'second-floor-closing';
+```
+
+### SmartSecondFloorLayoutRef
+
+```ts
+interface SmartSecondFloorLayoutRef {
+  beginRefresh(delay?: number): boolean;
+  finishRefresh(options?: { success?: boolean; delay?: number }): void;
+  openSecondFloor(): boolean;
+  closeSecondFloor(): boolean;
+}
+```
+
+`beginRefresh` 返回 `false` 表示已有刷新或二楼处于打开/动画状态；`openSecondFloor` 返回
+`true` 表示命令已派发给空闲的已挂载实例，`closeSecondFloor` 返回 `true` 表示当前处于
+可关闭的打开/展开状态。所有布尔返回值描述的是命令接受情况，不是动画完成情况。
+
+二楼内容可以是嵌套 `ScrollView` 或 `FlatList`，但外层 `TwoLevelHeader` 会在边界拖拽时
+接管触摸；务必给内部滚动组件配置 `nestedScrollEnabled`，并避免把横向分页手势放在同一
+个边界区域。这个限制是原生手势竞争，不是 `onStateChange` 的状态缺失。

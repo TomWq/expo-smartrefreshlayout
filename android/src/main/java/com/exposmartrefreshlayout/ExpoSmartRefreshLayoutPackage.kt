@@ -8,7 +8,13 @@ import com.facebook.react.uimanager.ViewManager
 
 class ExpoSmartRefreshLayoutPackage : BaseReactPackage() {
   override fun createViewManagers(reactContext: ReactApplicationContext): List<ViewManager<*, *>> =
-    listOf(ExpoSmartRefreshLayoutViewManager())
+    listOf(
+      ExpoSmartRefreshLayoutViewManager(),
+      ExpoSmartSecondFloorLayoutViewManager(),
+      ExpoSmartSecondFloorContentSlotViewManager(),
+      ExpoSmartSecondFloorFloorSlotViewManager(),
+      ExpoSmartSecondFloorFloorContentSlotViewManager(),
+    )
 
   override fun getModule(name: String, reactContext: ReactApplicationContext): NativeModule? = null
 

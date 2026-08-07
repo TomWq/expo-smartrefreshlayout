@@ -70,8 +70,14 @@ export const SmartRefreshLayout = forwardRef<
     hasMore = true,
     hapticsEnabled = true,
     headerStyle = 'classic',
+    primaryColor,
     indicatorColor,
     titleColor,
+    classicSpinnerStyle = 'translate',
+    classicEnableLastTime = true,
+    materialShowBezierWave = false,
+    materialEnableHeaderTranslationContent = false,
+    materialProgressBackgroundColor,
     messages,
     onRefresh,
     onLoadMore,
@@ -452,8 +458,14 @@ export const SmartRefreshLayout = forwardRef<
       noMoreData={!hasMore}
       hapticsEnabled={hapticsEnabled}
       headerStyle={headerStyle}
+      primaryColor={primaryColor}
       indicatorColor={indicatorColor}
       titleColor={titleColor}
+      classicSpinnerStyle={classicSpinnerStyle}
+      classicEnableLastTime={classicEnableLastTime}
+      materialShowBezierWave={materialShowBezierWave}
+      materialEnableHeaderTranslationContent={materialEnableHeaderTranslationContent}
+      materialProgressBackgroundColor={materialProgressBackgroundColor}
       pullDownText={resolvedMessages.pullDown}
       releaseToRefreshText={resolvedMessages.releaseToRefresh}
       refreshingText={resolvedMessages.refreshing}

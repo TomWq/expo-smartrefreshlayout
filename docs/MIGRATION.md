@@ -36,6 +36,10 @@ Expo 应用可以继续使用该库，但需要 development build 或本地原�
 | `onStateChanged` | `onStateChange` |
 | Classic Header/Footer 文字对象 | `messages` |
 | Header/Footer 强调色 | `indicatorColor`、`titleColor` |
+| Classic `setSpinnerStyle` | `classicSpinnerStyle` |
+| Classic `setEnableLastTime` | `classicEnableLastTime` |
+| Material `setShowBezierWave` | `materialShowBezierWave` |
+| Material `setEnableHeaderTranslationContent` | `materialEnableHeaderTranslationContent` |
 
 `onRefresh` 和 `onLoadMore` 现在可以返回 Promise，非受控模式会自动结束动画：
 
@@ -84,7 +88,10 @@ const refreshRef = useRef<SmartRefreshLayoutRef>(null);
 - `renderHeader`、`renderFooter` 和 `DefaultRefreshHeader`
 - `onHeaderMoving`、`onFooterMoving`
 - Header/Footer 高度、拖拽倍率、回弹时间等 Android 细粒度参数
-- `classicRefreshHeaderProps`、`classicLoadMoreFooterProps` 中除文案和颜色外的配置
+- 旧 `classicRefreshHeaderProps`、`classicLoadMoreFooterProps` 对象形式；Classic/Material
+  官方样式配置请改用 `classicSpinnerStyle`、`classicEnableLastTime`、
+  `materialShowBezierWave`、`materialEnableHeaderTranslationContent` 和
+  `materialProgressBackgroundColor`
 - Paper 旧架构支持
 
 自动加载的触发语义也已收紧：不会因为初始内容测量、短列表或 footer 回弹直接发起请求，必须先发生真实的向上滚动。分页回调可以返回 `{ hasMore }`，避免依赖异步的 `hasMore` render 时序。
@@ -107,3 +114,26 @@ onRefresh={async () => {
 ```
 
 未传受控状态时，不需要手动调用 finish 命令。
+
+## 6. Android 二楼能力
+
+v2 新增的 `SmartSecondFloorLayout` 是独立的 Android-only 组件，不是旧
+`SmartRefreshLayout` 的一个 Header 配置。普通内容仍是唯一的 `children`，二楼内容通过
+`secondFloor` 槽位传入；可选 `secondFloorBackground` 会放在其后并在手势中显现。它没有 `onLoadMore` 或 footer。`floorRate`、`maxRate`、
+`refreshRate`、`floorDuration`、`pullToCloseEnabled` 和 `bottomPullUpToCloseRate` 对应
+SmartRefreshLayout `TwoLevelHeader` 的参数。
+
+```tsx
+<SmartSecondFloorLayout
+  ref={floorRef}
+  secondFloor={<ScrollView nestedScrollEnabled>{floorContent}</ScrollView>}
+  onRefresh={reload}
+>
+  <FlatList data={rows} renderItem={renderRow} />
+</SmartSecondFloorLayout>
+```
+
+`openSecondFloor()`、`closeSecondFloor()` 的布尔返回值表示命令是否被已挂载实例接受，
+不是动画完成信号；用 `onSecondFloorOpen`、`onSecondFloorClose` 和 `onStateChange` 监听
+生命周期。iOS 没有 TwoLevelHeader 等价实现，不能在 iOS 渲染该组件；请在平台分支中继续
+使用 `SmartRefreshLayout`。

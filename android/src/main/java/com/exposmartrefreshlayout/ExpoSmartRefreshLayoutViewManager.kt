@@ -79,11 +79,27 @@ internal class ExpoSmartRefreshLayoutViewManager :
   override fun setAutoLoadMoreEnabled(view: ExpoSmartRefreshLayoutView, value: Boolean) = view.setAutoLoadMoreEnabled(value)
   override fun setRefreshing(view: ExpoSmartRefreshLayoutView, value: Boolean) = view.setRefreshing(value)
   override fun setLoadingMore(view: ExpoSmartRefreshLayoutView, value: Boolean) = view.setLoadingMore(value)
-  override fun setNoMoreData(view: ExpoSmartRefreshLayoutView, value: Boolean) = view.setNoMoreData(value)
+  override fun setNoMoreData(view: ExpoSmartRefreshLayoutView, value: Boolean) =
+    view.setNoMoreDataState(value)
   override fun setHapticsEnabled(view: ExpoSmartRefreshLayoutView, value: Boolean) = view.setHapticsEnabled(value)
   override fun setHeaderStyle(view: ExpoSmartRefreshLayoutView, value: String?) = view.setHeaderStyle(value)
+  override fun setPrimaryColor(view: ExpoSmartRefreshLayoutView, value: Int?) = view.setPrimaryColor(value)
   override fun setIndicatorColor(view: ExpoSmartRefreshLayoutView, value: Int?) = view.setIndicatorColor(value)
   override fun setTitleColor(view: ExpoSmartRefreshLayoutView, value: Int?) = view.setTitleColor(value)
+  override fun setClassicSpinnerStyle(view: ExpoSmartRefreshLayoutView, value: String?) =
+    view.setClassicSpinnerStyle(value)
+  override fun setClassicEnableLastTime(view: ExpoSmartRefreshLayoutView, value: Boolean) =
+    view.setClassicEnableLastTime(value)
+  override fun setMaterialShowBezierWave(view: ExpoSmartRefreshLayoutView, value: Boolean) =
+    view.setMaterialShowBezierWave(value)
+  override fun setMaterialEnableHeaderTranslationContent(
+    view: ExpoSmartRefreshLayoutView,
+    value: Boolean
+  ) = view.setMaterialEnableHeaderTranslationContent(value)
+  override fun setMaterialProgressBackgroundColor(
+    view: ExpoSmartRefreshLayoutView,
+    value: Int?
+  ) = view.setMaterialProgressBackgroundColor(value)
   override fun setPullDownText(view: ExpoSmartRefreshLayoutView, value: String?) = view.setPullDownText(value)
   override fun setReleaseToRefreshText(view: ExpoSmartRefreshLayoutView, value: String?) = view.setReleaseToRefreshText(value)
   override fun setRefreshingText(view: ExpoSmartRefreshLayoutView, value: String?) = view.setRefreshingText(value)
@@ -109,7 +125,7 @@ internal class ExpoSmartRefreshLayoutViewManager :
     noMoreData: Boolean,
     delayMs: Int
   ) = view.finishLoadMore(requestId, success, noMoreData, delayMs)
-  override fun resetNoMoreData(view: ExpoSmartRefreshLayoutView) = view.resetNoMoreData()
+  override fun resetNoMoreData(view: ExpoSmartRefreshLayoutView) = view.resetNoMoreDataState()
 
   override fun getExportedCustomDirectEventTypeConstants(): MutableMap<String, Any> =
     mutableMapOf(

@@ -1,7 +1,7 @@
 {
   "name": "expo-smartrefreshlayout",
   "version": "2.0.0-alpha.0",
-  "description": "A React Native Fabric pull-to-refresh and load-more component backed by SmartRefreshLayout and MJRefresh",
+  "description": "A React Native Fabric pull-to-refresh and load-more component backed by SmartRefreshLayout and SmartRefreshControl",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",
   "react-native": "src/index.ts",
@@ -43,10 +43,8 @@
       "javaPackageName": "com.exposmartrefreshlayout"
     },
     "ios": {
-      "components": {
-        "ExpoSmartRefreshLayoutView": {
-          "className": "ExpoSmartRefreshLayoutView"
-        }
+      "componentProvider": {
+        "ExpoSmartRefreshLayoutView": "ExpoSmartRefreshLayoutView"
       }
     }
   },
@@ -87,7 +85,7 @@
   "bugs": {
     "url": "https://github.com/TomWq/expo-smartrefreshlayout/issues"
   },
-  "author": "尚博信_王强 <wangqiang03@sunboxsoft.com> (https://github.com/TomWq)",
+  "author": "TomWq <582752848@qq.com> (https://github.com/TomWq)",
   "license": "MIT",
   "homepage": "https://github.com/TomWq/expo-smartrefreshlayout#readme",
   "devDependencies": {
