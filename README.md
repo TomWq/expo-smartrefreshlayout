@@ -246,6 +246,8 @@ refreshRef.current?.resetNoMoreData();
 
 ## 文档
 
+- [在线文档（中文）](https://tomwq.github.io/expo-smartrefreshlayout/)
+- [Online documentation (English)](https://tomwq.github.io/expo-smartrefreshlayout/en/)
 - [完整 API](./docs/API.md)
 - [常用示例](./docs/EXAMPLES.md)
 - [v1 到 v2 迁移](./docs/MIGRATION.md)

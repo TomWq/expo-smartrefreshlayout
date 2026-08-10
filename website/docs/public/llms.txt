@@ -1,0 +1,12 @@
+# expo-smartrefreshlayout
+
+React Native Fabric native component for pull-to-refresh, load-more, and Android second-floor interactions.
+
+- Project: https://tomwq.github.io/expo-smartrefreshlayout/
+- Capabilities: https://tomwq.github.io/expo-smartrefreshlayout/guide/refresh-and-load-more
+- Chinese documentation: https://tomwq.github.io/expo-smartrefreshlayout/
+- English documentation: https://tomwq.github.io/expo-smartrefreshlayout/en/
+- API reference (Chinese): https://tomwq.github.io/expo-smartrefreshlayout/api/
+- API reference (English): https://tomwq.github.io/expo-smartrefreshlayout/en/api/
+- GitHub: https://github.com/TomWq/expo-smartrefreshlayout
+- npm: https://www.npmjs.com/package/expo-smartrefreshlayout
