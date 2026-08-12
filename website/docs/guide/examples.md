@@ -1,6 +1,6 @@
 ---
 title: 完整示例
-description: Promise 自动结束、受控状态、实例命令、自动加载和 Android 淘宝二楼的完整示例。
+description: Promise 自动结束、Lottie 自定义 Header、受控状态、实例命令、自动加载和 Android 淘宝二楼的完整示例。
 ---
 
 # 完整示例
@@ -79,8 +79,9 @@ Material 页对应官方的贝塞尔背景、内容偏移和进度圆颜色：
 </SmartRefreshLayout>
 ```
 
-仓库中的 `example/App.tsx` 提供了独立的 Classic 与 Material 配置页，可直接切换
-Spinner/波浪/内容偏移和主题色。
+仓库中的 [Classic 页面](https://github.com/TomWq/expo-smartrefreshlayout/blob/main/example/app/classic.tsx)
+和 [Material 页面](https://github.com/TomWq/expo-smartrefreshlayout/blob/main/example/app/material.tsx)
+是 Expo Router 路由，可直接切换 Spinner、波浪、内容偏移和主题色。
 
 Classic 配置页初始使用官方 XML 的默认组合：透明 primary、深色 accent、显示最后更新时间，
 并在每次配置变化后自动触发一次刷新预览；如果已有请求进行中，组件会拒绝新的主动请求以避免并发。
@@ -92,6 +93,118 @@ Classic 配置页初始使用官方 XML 的默认组合：透明 primary、深�
   <ScrollView>{content}</ScrollView>
 </SmartRefreshLayout>
 ```
+
+## Lottie 自定义 Header
+
+完整的 Expo Router 示例位于
+[example/app/lottie.tsx](https://github.com/TomWq/expo-smartrefreshlayout/blob/main/example/app/lottie.tsx)。
+下面的独立组件展示整个生命周期：`pulling`/`ready` 时 `progress` 跟随原生下拉和回弹；刷新时去掉
+受控 `progress` 并使用 `play()` + `loop`；完成后 `pause()` + `reset()`。不能只在
+`isDragging=true` 时更新进度，否则取消下拉时不会回到首帧。
+
+```tsx
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { FlatList, Text, View } from 'react-native';
+import LottieView from 'lottie-react-native';
+import {
+  SmartRefreshLayout,
+  type HeaderMovingEvent,
+} from 'expo-smartrefreshlayout';
+
+const rows = ['Inbox', 'Mentions', 'Saved'];
+const wait = (milliseconds: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
+
+export function LottieRefreshList() {
+  const lottieRef = useRef<LottieView>(null);
+  const refreshingRef = useRef(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [headerProgress, setHeaderProgress] = useState(0);
+  const [headerOffset, setHeaderOffset] = useState(0);
+
+  refreshingRef.current = refreshing;
+
+  useEffect(() => {
+    const animation = lottieRef.current;
+    if (refreshing) {
+      animation?.play();
+      return;
+    }
+
+    animation?.pause();
+    animation?.reset();
+  }, [refreshing]);
+
+  const handleHeaderMoving = useCallback(({ percent, offset }: HeaderMovingEvent) => {
+    if (refreshingRef.current) {
+      return;
+    }
+
+    setHeaderProgress(Math.min(Math.max(percent, 0), 1));
+    setHeaderOffset(Math.max(0, Math.round(offset)));
+  }, []);
+
+  const refresh = useCallback(async () => {
+    refreshingRef.current = true;
+    setRefreshing(true);
+
+    try {
+      await wait(900);
+    } finally {
+      refreshingRef.current = false;
+      setRefreshing(false);
+      setHeaderProgress(0);
+      setHeaderOffset(0);
+    }
+  }, []);
+
+  const handleAnimationLoaded = useCallback(() => {
+    if (refreshingRef.current) {
+      lottieRef.current?.play();
+    }
+  }, []);
+
+  return (
+    <SmartRefreshLayout
+      style={{ flex: 1 }}
+      loadMoreEnabled={false}
+      refreshHeader={
+        <View
+          pointerEvents="none"
+          style={{ alignItems: 'center', height: 80, justifyContent: 'center' }}
+        >
+          <LottieView
+            ref={lottieRef}
+            source={require('../assets/load.json')}
+            progress={refreshing ? undefined : headerProgress}
+            loop
+            style={{ height: 48, width: 48 }}
+            onAnimationLoaded={handleAnimationLoaded}
+          />
+          <Text>
+            {refreshing
+              ? '正在刷新...'
+              : headerProgress >= 1
+                ? '松开刷新'
+                : `下拉 ${headerOffset} px`}
+          </Text>
+        </View>
+      }
+      onHeaderMoving={handleHeaderMoving}
+      onRefresh={refresh}
+    >
+      <FlatList
+        data={rows}
+        keyExtractor={(item) => item}
+        renderItem={({ item }) => <Text style={{ padding: 24 }}>{item}</Text>}
+      />
+    </SmartRefreshLayout>
+  );
+}
+```
+
+自定义 Header 是原生槽位中的固定 `80` 逻辑像素区域。`offset`、`height`、`maxDragHeight` 的单位是
+Android dp / iOS pt；`percent >= 1` 表示到达刷新阈值。
 
 ## 错误处理
 

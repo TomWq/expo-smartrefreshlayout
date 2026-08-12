@@ -49,5 +49,13 @@ Return a Promise from callbacks in uncontrolled mode instead of manually finishi
 | `enableHapticFeedback` | `hapticsEnabled` |
 | `headerType="classics"` | `headerStyle="classic"` |
 | `onStateChanged` | `onStateChange` |
+| `renderHeader` | `refreshHeader` |
+| `onHeaderMoving` | `onHeaderMoving` with `percent`, `offset`, `height`, `maxDragHeight`, and `isDragging` |
 
-Custom header rendering, moving callbacks, Paper support, and the old global module are not part of v2.
+`refreshHeader` mounts React content into the native Header slot on both platforms instead of into list content, and
+replaces the Classic or Material header. The custom Header has a fixed logical height of `80`.
+`onHeaderMoving` reports `offset`, `height`, and `maxDragHeight` in dp/pt logical pixels; `percent >= 1` is the
+refresh threshold.
+
+`renderFooter`, `DefaultRefreshHeader`, `onFooterMoving`, Paper support, and the old global module are not part of
+v2. Legacy Header/Footer height, drag-rate, and rebound-time tuning parameters also remain unsupported.

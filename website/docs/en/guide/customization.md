@@ -43,6 +43,118 @@ Material bezier and content-translation switches are Android-specific and ignore
 implementations support `indicatorColor` and `materialProgressBackgroundColor`; iOS keeps `primaryColor` for
 Classic headers and footers.
 
+## Custom Lottie header
+
+`refreshHeader` mounts its content in the native Header slot and replaces the Classic or Material header. This
+example drives Lottie `progress` from pull distance during `pulling` and `ready`. Do not filter the callback on
+`isDragging`: release spring-back must be able to return the animation to `0`. Once `refreshing` begins, remove the
+controlled `progress` and use `play()` with `loop`; when it returns to `idle`, call `pause()` and `reset()`.
+
+```tsx
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { FlatList, Text, View } from 'react-native';
+import LottieView from 'lottie-react-native';
+import {
+  SmartRefreshLayout,
+  type HeaderMovingEvent,
+} from 'expo-smartrefreshlayout';
+
+const rows = ['Inbox', 'Mentions', 'Saved'];
+const wait = (milliseconds: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
+
+export function LottieRefreshList() {
+  const lottieRef = useRef<LottieView>(null);
+  const refreshingRef = useRef(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [headerProgress, setHeaderProgress] = useState(0);
+  const [headerOffset, setHeaderOffset] = useState(0);
+
+  refreshingRef.current = refreshing;
+
+  useEffect(() => {
+    const animation = lottieRef.current;
+    if (refreshing) {
+      animation?.play();
+      return;
+    }
+
+    animation?.pause();
+    animation?.reset();
+  }, [refreshing]);
+
+  const handleHeaderMoving = useCallback(({ percent, offset }: HeaderMovingEvent) => {
+    // Keep rebound updates so cancelling a pull returns the animation to frame 0.
+    if (refreshingRef.current) {
+      return;
+    }
+
+    setHeaderProgress(Math.min(Math.max(percent, 0), 1));
+    setHeaderOffset(Math.max(0, Math.round(offset)));
+  }, []);
+
+  const refresh = useCallback(async () => {
+    refreshingRef.current = true;
+    setRefreshing(true);
+
+    try {
+      await wait(900);
+    } finally {
+      refreshingRef.current = false;
+      setRefreshing(false);
+      setHeaderProgress(0);
+      setHeaderOffset(0);
+    }
+  }, []);
+
+  const handleAnimationLoaded = useCallback(() => {
+    if (refreshingRef.current) {
+      lottieRef.current?.play();
+    }
+  }, []);
+
+  return (
+    <SmartRefreshLayout
+      style={{ flex: 1 }}
+      loadMoreEnabled={false}
+      refreshHeader={
+        <View
+          pointerEvents="none"
+          style={{ alignItems: 'center', height: 80, justifyContent: 'center' }}
+        >
+          <LottieView
+            ref={lottieRef}
+            source={require('../assets/load.json')}
+            progress={refreshing ? undefined : headerProgress}
+            loop
+            style={{ height: 48, width: 48 }}
+            onAnimationLoaded={handleAnimationLoaded}
+          />
+          <Text>
+            {refreshing
+              ? 'Refreshing...'
+              : headerProgress >= 1
+                ? 'Release to refresh'
+                : `Pull ${headerOffset} px`}
+          </Text>
+        </View>
+      }
+      onHeaderMoving={handleHeaderMoving}
+      onRefresh={refresh}
+    >
+      <FlatList
+        data={rows}
+        keyExtractor={(item) => item}
+        renderItem={({ item }) => <Text style={{ padding: 24 }}>{item}</Text>}
+      />
+    </SmartRefreshLayout>
+  );
+}
+```
+
+`offset`, `height`, and `maxDragHeight` in `onHeaderMoving` are logical pixels (Android dp / iOS pt), and
+`percent >= 1` is the refresh threshold. A custom Header currently has a fixed logical height of `80`.
+
 ## Messages and haptics
 
 Pass a partial `messages` object to localize pull, release, loading, completion, and no-more-data states.

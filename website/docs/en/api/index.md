@@ -18,6 +18,7 @@ The component requires exactly one `FlatList`, `SectionList`, `ScrollView`, or c
 | Prop | Type | Default | Description |
 | --- | --- | --- | --- |
 | `children` | `ReactElement` | required | The single scrolling child |
+| `refreshHeader` | `ReactElement` | - | React content mounted in the Android/iOS native refresh-header slot; replaces the Classic or Material header selected by `headerStyle` |
 | `refreshEnabled` | `boolean` | has `onRefresh` | Enables pull to refresh |
 | `loadMoreEnabled` | `boolean` | has `onLoadMore` | Enables load more |
 | `loadMoreMode` | `'pull' \| 'auto'` | `'pull'` | `pull` requires a pull-release; `auto` waits for overflowing content and a real upward scroll |
@@ -41,8 +42,20 @@ The component requires exactly one `FlatList`, `SectionList`, `ScrollView`, or c
 | `onRefreshError` | `(error: unknown) => void` | - | Refresh failure notification |
 | `onLoadMoreError` | `(error: unknown) => void` | - | Pagination failure notification |
 | `onStateChange` | `(state: RefreshState) => void` | - | Native state change |
+| `onHeaderMoving` | `(event: HeaderMovingEvent) => void` | - | Custom-header pull-distance updates, including spring-back after release |
 
 Other `ViewProps` pass through to the native container.
+
+### Custom native header
+
+`refreshHeader` is mounted in a real Android/iOS native refresh-header slot, rather than as an ordinary child of the
+list. When supplied, it replaces the Classic or Material header chosen by `headerStyle`. A custom header currently
+has a fixed logical height of `80`; lay its content out inside that area. For display-only content, use
+`pointerEvents="none"` so it cannot intercept the list's pull gesture.
+
+`onHeaderMoving` fires while dragging and while the header springs back after release. `offset`, `height`, and
+`maxDragHeight` are platform-independent logical pixels (Android dp / iOS pt); `percent >= 1` means the refresh
+threshold has been reached.
 
 ### Header colors and behavior
 
@@ -125,6 +138,19 @@ interface LoadMoreResult {
   hasMore: boolean;
 }
 
+interface HeaderMovingEvent {
+  /** Pull distance relative to the refresh trigger threshold. */
+  percent: number;
+  /** Current header pull distance in logical pixels (dp/pt). */
+  offset: number;
+  /** Native header height in logical pixels (dp/pt). */
+  height: number;
+  /** Maximum pull distance in logical pixels (dp/pt). */
+  maxDragHeight: number;
+  /** Whether the user is actively dragging the scroll view. */
+  isDragging: boolean;
+}
+
 type RefreshState =
   | 'idle'
   | 'pulling'
@@ -175,7 +201,7 @@ v2 temporarily keeps the old component name as an alias:
 import { ExpoSmartrefreshlayoutView } from 'expo-smartrefreshlayout';
 ```
 
-It accepts v2 props. The old `ExpoSmartrefreshlayoutModule`, legacy props, and custom header APIs are not present.
+It accepts v2 props. The old `ExpoSmartrefreshlayoutModule` and legacy v1 props are not present.
 
 ## SmartSecondFloorLayout (Android only)
 

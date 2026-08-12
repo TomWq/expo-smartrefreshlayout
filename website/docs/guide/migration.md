@@ -39,6 +39,8 @@ Expo 应用可以继续使用该库，但需要 development build 或本地原�
 | `headerType="classics"` | `headerStyle="classic"` |
 | `headerType="material"` | `headerStyle="material"` |
 | `onStateChanged` | `onStateChange` |
+| `renderHeader` | `refreshHeader` |
+| `onHeaderMoving` | `onHeaderMoving`，事件字段改为 `percent`、`offset`、`height`、`maxDragHeight`、`isDragging` |
 | Classic Header/Footer 文字对象 | `messages` |
 | Header/Footer 强调色 | `indicatorColor`、`titleColor` |
 | Classic `setSpinnerStyle` | `classicSpinnerStyle` |
@@ -54,6 +56,10 @@ Expo 应用可以继续使用该库，但需要 development build 或本地原�
 -  ExpoSmartrefreshlayoutModule.finishRefresh(true, 300);
  };
 ```
+
+`refreshHeader` 会把 React 内容挂载到两端原生 Header 槽位，而不是放入列表内容；提供后会覆盖
+Classic/Material Header。自定义 Header 当前固定为 `80` 逻辑像素高；`onHeaderMoving` 的
+`offset`、`height`、`maxDragHeight` 使用 dp/pt 逻辑像素，`percent >= 1` 表示到达刷新阈值。
 
 ## 3. 删除全局 Module 调用
 
@@ -88,10 +94,10 @@ const refreshRef = useRef<SmartRefreshLayoutRef>(null);
 
 ## 4. 移除的 API
 
-为了让 Android 和 iOS 行为一致，v2 首版只保留可跨平台验证的核心能力。以下 v1 API 暂未迁移：
+为了让 Android 和 iOS 行为一致，以下 v1 API 仍未迁移：
 
-- `renderHeader`、`renderFooter` 和 `DefaultRefreshHeader`
-- `onHeaderMoving`、`onFooterMoving`
+- `renderFooter` 和 `DefaultRefreshHeader`
+- `onFooterMoving`
 - Header/Footer 高度、拖拽倍率、回弹时间等 Android 细粒度参数
 - 旧 `classicRefreshHeaderProps`、`classicLoadMoreFooterProps` 对象形式；Classic/Material
   官方样式配置请改用 `classicSpinnerStyle`、`classicEnableLastTime`、
@@ -101,7 +107,7 @@ const refreshRef = useRef<SmartRefreshLayoutRef>(null);
 
 自动加载的触发语义也已收紧：不会因为初始内容测量、短列表或 footer 回弹直接发起请求，必须先发生真实的向上滚动。分页回调可以返回 `{ hasMore }`，避免依赖异步的 `hasMore` render 时序。
 
-需要这些能力时不要把旧 Props 原样留在代码中；TypeScript 会将其报告为错误。后续扩展应优先设计为两端一致的 Fabric Props 或 Commands。
+不要把上述仍未迁移的旧 Props 原样留在代码中；TypeScript 会将其报告为错误。后续扩展应优先设计为两端一致的 Fabric Props 或 Commands。
 
 ## 5. 受控状态
 

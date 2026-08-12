@@ -18,6 +18,7 @@ import { SmartRefreshLayout } from 'expo-smartrefreshlayout';
 | 属性 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- |
 | `children` | `ReactElement` | 必填 | 唯一的滚动子组件 |
+| `refreshHeader` | `ReactElement` | - | 挂载到 Android/iOS 原生刷新 Header 槽位的 React 内容；提供后替代 `headerStyle` 选中的 Classic/Material Header |
 | `refreshEnabled` | `boolean` | 是否提供 `onRefresh` | 是否允许下拉刷新 |
 | `loadMoreEnabled` | `boolean` | 是否提供 `onLoadMore` | 是否允许上拉加载 |
 | `loadMoreMode` | `'pull' | 'auto'` | `'pull'` | `pull` 需要上拉释放；`auto` 需要先真实向上滚动且内容超过一屏 |
@@ -41,8 +42,19 @@ import { SmartRefreshLayout } from 'expo-smartrefreshlayout';
 | `onRefreshError` | `(error: unknown) => void` | - | `onRefresh` 抛错后的通知 |
 | `onLoadMoreError` | `(error: unknown) => void` | - | `onLoadMore` 抛错后的通知 |
 | `onStateChange` | `(state: RefreshState) => void` | - | 原生刷新状态变化 |
+| `onHeaderMoving` | `(event: HeaderMovingEvent) => void` | - | 自定义 Header 的下拉距离变化，包含松手后的回弹过程 |
 
 其余 `ViewProps` 会传给原生容器。
+
+### 自定义原生 Header
+
+`refreshHeader` 的内容会真实挂载到 Android 和 iOS 的原生刷新 Header 槽位，而不是作为列表中的普通
+React 子节点。提供它后，会覆盖 `headerStyle` 选中的 Classic 或 Material Header。当前自定义 Header 的
+固定逻辑高度为 `80`；应让内容在这个区域内完成布局。纯展示内容建议设置 `pointerEvents="none"`，避免
+截获列表的下拉手势。
+
+`onHeaderMoving` 在拖拽和松手回弹时都会发出事件。`offset`、`height`、`maxDragHeight` 均为跨平台一致的
+逻辑像素（Android dp / iOS pt）；`percent >= 1` 表示已达到刷新触发阈值。
 
 ### Classic 与 Material 配置
 
@@ -127,6 +139,19 @@ interface RefreshRequest {
 interface LoadMoreResult {
   hasMore: boolean;
 }
+
+interface HeaderMovingEvent {
+  /** 相对于刷新触发阈值的下拉进度。 */
+  percent: number;
+  /** 当前 Header 下拉距离，单位为逻辑像素（dp/pt）。 */
+  offset: number;
+  /** 原生 Header 高度，单位为逻辑像素（dp/pt）。 */
+  height: number;
+  /** 最大可下拉距离，单位为逻辑像素（dp/pt）。 */
+  maxDragHeight: number;
+  /** 用户当前是否正在拖拽滚动视图。 */
+  isDragging: boolean;
+}
 ```
 
 ### RefreshState
@@ -202,7 +227,7 @@ v2 暂时保留旧组件名作为别名：
 import { ExpoSmartrefreshlayoutView } from 'expo-smartrefreshlayout';
 ```
 
-别名使用的仍是 v2 Props。旧的 `ExpoSmartrefreshlayoutModule`、旧 Props 和自定义 Header API 不再存在。
+别名使用的仍是 v2 Props。旧的 `ExpoSmartrefreshlayoutModule` 和旧 Props 不再存在。
 
 ## SmartSecondFloorLayout（仅 Android）
 
