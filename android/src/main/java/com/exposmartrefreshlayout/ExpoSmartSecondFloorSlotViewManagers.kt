@@ -12,6 +12,7 @@ import com.facebook.react.viewmanagers.ExpoSmartSecondFloorFloorContentSlotManag
 import com.facebook.react.viewmanagers.ExpoSmartSecondFloorFloorContentSlotManagerInterface
 
 @ReactModule(name = ExpoSmartSecondFloorContentSlotViewManager.NAME)
+// 槽位 Manager 本身不做布局；它只让 Fabric 创建可识别的宿主，真实挂载由二楼根组件接管。
 internal class ExpoSmartSecondFloorContentSlotViewManager :
   ViewGroupManager<ExpoSmartSecondFloorContentSlotView>(),
   ExpoSmartSecondFloorContentSlotManagerInterface<ExpoSmartSecondFloorContentSlotView> {
@@ -32,6 +33,7 @@ internal class ExpoSmartSecondFloorContentSlotViewManager :
 }
 
 @ReactModule(name = ExpoSmartSecondFloorFloorSlotViewManager.NAME)
+// 背景槽位会被根组件放到 TwoLevelHeader 底层，用于下拉阶段逐步揭露。
 internal class ExpoSmartSecondFloorFloorSlotViewManager :
   ViewGroupManager<ExpoSmartSecondFloorFloorSlotView>(),
   ExpoSmartSecondFloorFloorSlotManagerInterface<ExpoSmartSecondFloorFloorSlotView> {
@@ -52,6 +54,7 @@ internal class ExpoSmartSecondFloorFloorSlotViewManager :
 }
 
 @ReactModule(name = ExpoSmartSecondFloorFloorContentSlotViewManager.NAME)
+// 二楼内容槽位独立于背景，便于原生开合生命周期单独控制其透明度。
 internal class ExpoSmartSecondFloorFloorContentSlotViewManager :
   ViewGroupManager<ExpoSmartSecondFloorFloorContentSlotView>(),
   ExpoSmartSecondFloorFloorContentSlotManagerInterface<ExpoSmartSecondFloorFloorContentSlotView> {

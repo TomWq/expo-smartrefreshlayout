@@ -6,16 +6,20 @@ import React, {
   useState,
   useEffect,
 } from 'react';
-import type { NativeSyntheticEvent } from 'react-native';
+import { StyleSheet, type NativeSyntheticEvent } from 'react-native';
+
+import NativeSmartRefreshHeaderSlot from './NativeSmartRefreshHeaderSlot';
 
 import NativeSmartRefreshLayout, {
   Commands,
+  type HeaderMovingEvent as NativeHeaderMovingEvent,
   type RequestEvent,
   type StateChangeEvent,
 } from './NativeSmartRefreshLayout';
 import type {
   FinishLoadMoreOptions,
   FinishRefreshOptions,
+  HeaderMovingEvent,
   LoadMoreResult,
   RefreshRequest,
   RefreshState,
@@ -46,8 +50,11 @@ type OperationKind = 'refresh' | 'load-more';
 
 interface ActiveOperation {
   kind: OperationKind;
+  /** 原生事件会回传该 id，完成命令也必须带回它，避免旧异步回调结束新请求。 */
   requestId: number;
+  /** 已接受与当前锁匹配的原生请求事件。 */
   started: boolean;
+  /** 已发送完成命令；重复事件必须忽略。 */
   finishing: boolean;
 }
 
@@ -61,6 +68,7 @@ export const SmartRefreshLayout = forwardRef<
 >(function SmartRefreshLayout(
   {
     children,
+    refreshHeader,
     refreshEnabled,
     loadMoreEnabled,
     loadMoreMode,
@@ -84,6 +92,7 @@ export const SmartRefreshLayout = forwardRef<
     onRefreshError,
     onLoadMoreError,
     onStateChange,
+    onHeaderMoving,
     ...viewProps
   },
   forwardedRef
@@ -102,11 +111,13 @@ export const SmartRefreshLayout = forwardRef<
   const loadingMore = refreshing
     ? false
     : controlledLoadingMore ?? internalLoadingMore;
+  /* `loadMoreMode="auto"` 是当前 API；仅在未提供 mode 时回退到已废弃的布尔属性。 */
   const resolvedAutoLoadMoreEnabled =
     loadMoreMode === 'auto' ||
     (loadMoreMode === undefined && autoLoadMoreEnabled);
   const resolvedMessages = { ...DEFAULT_MESSAGES, ...messages };
 
+  /** 为 JS 发起的命令分配请求 id；上限与 Fabric Int32 事件/命令类型一致。 */
   const allocateProgrammaticRequestId = useCallback(() => {
     const current = nextProgrammaticRequestIdRef.current;
     nextProgrammaticRequestIdRef.current =
@@ -124,6 +135,7 @@ export const SmartRefreshLayout = forwardRef<
         return;
       }
 
+      /* 先标记完成再发送命令；有延迟时保留请求锁，防止收尾动画期间的过期事件启动回调。 */
       active.finishing = true;
       const delay = normalizeDelay(options.delay);
       const clearOperation = () => {
@@ -134,6 +146,8 @@ export const SmartRefreshLayout = forwardRef<
       };
 
       if (kind === 'refresh') {
+        /* 非受控模式由组件维护 React 状态；受控模式由父组件把 prop 从 true 改为 false，
+         * 这里仅通知原生结束同一个请求。 */
         if (controlledRefreshing === undefined) {
           setInternalRefreshing(false);
         }
@@ -146,6 +160,7 @@ export const SmartRefreshLayout = forwardRef<
           );
         }
       } else {
+        /* 回调完成时把 `hasMore` 转换为原生相反含义的 `noMoreData` 标记。 */
         if (controlledLoadingMore === undefined) {
           setInternalLoadingMore(false);
         }
@@ -175,6 +190,7 @@ export const SmartRefreshLayout = forwardRef<
     (kind: OperationKind) => {
       const active = activeOperationRef.current;
       if (active?.kind === kind) {
+        /* 受控 prop 从 true 降为 false，表示父组件确认异步操作已完成。 */
         finishActiveOperation(
           kind,
           kind === 'load-more' ? { hasMore: hasMoreRef.current } : undefined
@@ -185,6 +201,7 @@ export const SmartRefreshLayout = forwardRef<
   );
 
   useEffect(() => {
+    /* 受控刷新/加载在各自 prop 的下降沿收尾；记录前值可避免初始 false 被误认为完成信号。 */
     if (
       previousControlledRefreshingRef.current === true &&
       controlledRefreshing === false
@@ -206,6 +223,7 @@ export const SmartRefreshLayout = forwardRef<
 
   useEffect(
     () => () => {
+      /* 卸载时取消延迟收尾，避免定时器在组件销毁后继续修改状态。 */
       if (finishTimerRef.current !== null) {
         clearTimeout(finishTimerRef.current);
       }
@@ -218,6 +236,7 @@ export const SmartRefreshLayout = forwardRef<
     forwardedRef,
     () => ({
       beginRefresh: (delay = 0) => {
+        /* ref 方法与手势事件共用单请求锁；原生稍后会以该 id 回传请求事件。 */
         if (activeOperationRef.current !== null || !nativeRef.current) {
           return false;
         }
@@ -239,6 +258,7 @@ export const SmartRefreshLayout = forwardRef<
         finishActiveOperation('refresh', { success, delay });
       },
       beginLoadMore: (delay = 0) => {
+        /* 最新 `hasMore` 表示已到列表末尾时，不再排队加载请求。 */
         if (
           activeOperationRef.current !== null ||
           !nativeRef.current ||
@@ -281,6 +301,7 @@ export const SmartRefreshLayout = forwardRef<
     ]
   );
 
+  /* 只有持有当前请求锁且 id 匹配的事件才能调用 JS；过期或属于另一操作的事件会用自身 id 立即收尾。 */
   const handleRefresh = useCallback(async (event: NativeSyntheticEvent<RequestEvent>) => {
     const request: RefreshRequest = {
       requestId: event.nativeEvent.requestId,
@@ -314,6 +335,8 @@ export const SmartRefreshLayout = forwardRef<
       };
     }
 
+    /* 非受控模式由组件把请求反映到 React；受控模式要求父组件自行设置 refreshing，
+     * 并通过上面的 prop 变化完成收尾。 */
     if (controlledRefreshing === undefined) {
       setInternalRefreshing(true);
     }
@@ -331,6 +354,8 @@ export const SmartRefreshLayout = forwardRef<
         !active.finishing
       ) {
         if (controlledRefreshing === undefined) {
+          /* 非受控回调在此负责清理状态并把成功标记发送给原生；受控回调保留锁，
+           * 直到父组件关闭 prop。 */
           setInternalRefreshing(false);
           activeOperationRef.current = null;
           if (nativeRef.current) {
@@ -341,6 +366,7 @@ export const SmartRefreshLayout = forwardRef<
     }
   }, [controlledRefreshing, onRefresh, onRefreshError]);
 
+  /* 加载更多沿用刷新请求 id 锁；调用回调前先检查 `hasMore`，回调结果决定是否进入无更多数据状态。 */
   const handleLoadMore = useCallback(async (event: NativeSyntheticEvent<RequestEvent>) => {
     const request: RefreshRequest = {
       requestId: event.nativeEvent.requestId,
@@ -387,6 +413,7 @@ export const SmartRefreshLayout = forwardRef<
     }
 
     if (!hasMoreRef.current) {
+      /* 列表到末尾后原生仍可能发出已排队的请求；直接结束它，不调用用户回调也不重新打开 footer。 */
       setInternalLoadingMore(false);
       activeOperationRef.current = null;
       if (nativeRef.current) {
@@ -402,6 +429,7 @@ export const SmartRefreshLayout = forwardRef<
     }
 
     if (controlledLoadingMore === undefined) {
+      /* 受控模式由父组件设置并清除 prop；非受控模式在本地镜像加载状态。 */
       setInternalLoadingMore(true);
     }
     let success = true;
@@ -419,6 +447,7 @@ export const SmartRefreshLayout = forwardRef<
         !active.finishing
       ) {
         if (controlledLoadingMore === undefined) {
+          /* 优先使用回调返回值，否则读取 ref 中最新的 `hasMore`，避免闭包捕获旧值。 */
           const nextHasMore =
             result && typeof result.hasMore === 'boolean'
               ? result.hasMore
@@ -444,6 +473,13 @@ export const SmartRefreshLayout = forwardRef<
       onStateChange?.(event.nativeEvent.state as RefreshState);
     },
     [onStateChange]
+  );
+
+  const handleHeaderMoving = useCallback(
+    (event: NativeSyntheticEvent<NativeHeaderMovingEvent>) => {
+      onHeaderMoving?.(event.nativeEvent);
+    },
+    [onHeaderMoving]
   );
 
   return (
@@ -477,10 +513,29 @@ export const SmartRefreshLayout = forwardRef<
       onRefresh={handleRefresh}
       onLoadMore={handleLoadMore}
       onStateChange={handleStateChange}
+      onHeaderMoving={handleHeaderMoving}
     >
+      {refreshHeader ? (
+        <NativeSmartRefreshHeaderSlot
+          collapsable={false}
+          style={styles.headerSlot}
+        >
+          {refreshHeader}
+        </NativeSmartRefreshHeaderSlot>
+      ) : null}
       {children}
     </NativeSmartRefreshLayout>
   );
 });
 
 SmartRefreshLayout.displayName = 'SmartRefreshLayout';
+
+const styles = StyleSheet.create({
+  headerSlot: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 80,
+  },
+});

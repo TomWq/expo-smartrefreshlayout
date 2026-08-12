@@ -17,8 +17,8 @@ import com.scwang.smart.refresh.layout.listener.OnMultiListener
 import kotlin.math.roundToInt
 
 /**
- * Android implementation of the Taobao-style second floor. React owns two
- * explicit slot hosts; SmartRefreshLayout owns their actual native placement.
+ * Android 二楼交互的原生实现。React 只负责声明内容、背景和二楼内容三个槽位，
+ * 槽位最终的原生层级与位置由 SmartRefreshLayout 管理。
  */
 internal class ExpoSmartSecondFloorLayoutView(
   context: ThemedReactContext
@@ -84,9 +84,8 @@ internal class ExpoSmartSecondFloorLayoutView(
 
   init {
     refreshLayout.apply {
-      // TwoLevelHeader intentionally positions its full-screen backdrop above
-      // the collapsed header. Keep that drawing inside this React container so
-      // it cannot paint over sibling UI such as the example's page tabs.
+      // TwoLevelHeader 会主动把全屏背景放到折叠 Header 上方。这里保留容器裁剪，
+      // 防止背景越过当前 React 组件边界，覆盖页面标签等兄弟控件。
       clipChildren = true
       clipToPadding = true
       setDragRate(0.5f)
@@ -105,8 +104,8 @@ internal class ExpoSmartSecondFloorLayoutView(
     insetRefreshHeader = InsetRefreshHeader(context, classicHeader)
     twoLevelHeader.setRefreshHeader(insetRefreshHeader)
     twoLevelHeader.setOnTwoLevelListener {
-      // TwoLevelHeader asks this listener after ReleaseToTwoLevel has already
-      // been published. That is a valid handoff, not a competing open command.
+      // TwoLevelHeader 在发布 ReleaseToTwoLevel 后才询问监听器，这是同一次手势的正常交接，
+      // 不能按“重复打开”拒绝，所以允许 RELEASE 生命周期继续进入二楼。
       canOpenSecondFloor(allowReleasedGesture = true)
     }
     refreshLayout.setRefreshHeader(twoLevelHeader)
@@ -118,6 +117,8 @@ internal class ExpoSmartSecondFloorLayoutView(
   }
 
   fun addReactChild(child: View, index: Int) {
+    // Fabric 只知道这些槽位都是 React 子节点，真正的原生父节点却不同：普通内容属于刷新容器，
+    // 背景和二楼内容属于 TwoLevelHeader。这里按槽位类型重新挂载，不能直接 addView。
     if (disposed) return
     require(
       child is ExpoSmartSecondFloorContentSlotView ||
@@ -154,6 +155,8 @@ internal class ExpoSmartSecondFloorLayoutView(
   fun getReactChildAt(index: Int): View? = reactChildren.getOrNull(index)
 
   fun removeReactChild(index: Int) {
+    // React 卸载槽位时同步恢复 SmartRefreshLayout 的合法结构；尤其内容槽位必须换回占位 View，
+    // 否则库内部仍可能持有已经从 Fabric 树移除的 RefreshContent。
     val child = reactChildren.getOrNull(index) ?: return
     reactChildren.removeAt(index)
     when (child) {
@@ -196,9 +199,8 @@ internal class ExpoSmartSecondFloorLayoutView(
         refreshLayout.autoRefreshAnimationOnly()
       }
     } else {
-      // Fabric may deliver the uncontrolled prop update before the matching
-      // finishRefresh command. Keep its native request id until that command
-      // completes so normal refresh feedback is not skipped.
+      // Fabric 可能先提交非受控 refreshing=false，再送达对应 finishRefresh 命令。
+      // 原生 requestId 必须保留到命令完成，避免正常的刷新完成反馈被跳过。
       if (
         !hasTrackedRefresh() &&
         refreshLayout.state != RefreshState.RefreshFinish &&
@@ -223,6 +225,8 @@ internal class ExpoSmartSecondFloorLayoutView(
   }
 
   fun setHeaderInset(value: Int) {
+    // JS 传入的是 dp；先限制极端值再换算像素，并清除 Header 高度缓存，
+    // 因为 inset 同时参与普通刷新与二楼阈值计算。
     val normalizedValue = value.coerceIn(0, MAX_HEADER_INSET_DP)
     if (requestedHeaderInsetDp == normalizedValue) return
 
@@ -311,6 +315,7 @@ internal class ExpoSmartSecondFloorLayoutView(
 
   fun finishRefresh(requestId: Int, success: Boolean, delayMs: Int) {
     if (disposed || isSecondFloorActive()) return
+    // 结束命令只允许命中同一个 requestId；0 保留给仅同步原生视觉、没有业务请求的场景。
     val active = activeRefresh
     val scheduled = scheduledRefresh
     val matchesActive = active?.requestId == requestId
@@ -319,6 +324,7 @@ internal class ExpoSmartSecondFloorLayoutView(
     if (!matchesActive && !matchesScheduled && !visualOnly) return
 
     postDelayedTracked(delayMs) {
+      // 延迟结束期间可能已有新请求接管，执行前再校验一次，防止旧命令关闭新动画。
       val currentActive = activeRefresh
       val currentScheduled = scheduledRefresh
       val stillActive = currentActive?.requestId == requestId
@@ -336,14 +342,13 @@ internal class ExpoSmartSecondFloorLayoutView(
   fun openSecondFloor() {
     if (disposed || !canOpenSecondFloor() || refreshLayout.state != RefreshState.None) return
     lifecycle = SecondFloorLifecycle.OPENING
-    // The imperative path starts the kernel's floor animation directly, so
-    // it bypasses TwoLevelReleased where gesture opens begin this fade.
+    // 命令式打开直接启动内核动画，不会经过手势路径的 TwoLevelReleased，
+    // 所以此处必须主动补上 Header 与二楼内容的交叉淡入淡出。
     animateInsetRefreshHeader(0f, configuredFloorDuration() / 2)
     setFloorContentAlpha(0f)
     animateFloorContent(1f, configuredFloorDuration() * 2)
     onStateChange?.invoke("second-floor-opening")
-    // The listener was already checked above. Avoid calling it twice for an
-    // imperative command while preserving the kernel's native animation.
+    // 上方已经完成打开条件检查，传 false 避免命令式打开重复调用监听器，同时保留内核原生动画。
     twoLevelHeader.openTwoLevel(false)
   }
 
@@ -366,12 +371,14 @@ internal class ExpoSmartSecondFloorLayoutView(
   }
 
   private fun attachContentSlot(slot: ExpoSmartSecondFloorContentSlotView) {
+    // 槽位可能先被 Fabric 临时挂到别处，迁移前先从旧父节点脱离，避免 Android 重复父节点异常。
     if (slot.parent === refreshLayout && contentSlot === slot) return
     (slot.parent as? ViewGroup)?.removeView(slot)
     refreshLayout.setRefreshContent(slot)
   }
 
   private fun attachFloorSlot(slot: ExpoSmartSecondFloorFloorSlotView) {
+    // 背景放在 TwoLevelHeader 最底层；刷新指示器最后置顶，保证下拉阶段仍可读且可交互。
     if (slot.parent === twoLevelHeader && floorSlot === slot) return
     (slot.parent as? ViewGroup)?.removeView(slot)
     twoLevelHeader.addView(
@@ -387,6 +394,7 @@ internal class ExpoSmartSecondFloorLayoutView(
   }
 
   private fun attachFloorContentSlot(slot: ExpoSmartSecondFloorFloorContentSlotView) {
+    // 正式二楼内容位于背景与刷新指示器之间，打开完成前用透明度隐藏，避免折叠态提前透出。
     if (slot.parent === twoLevelHeader && floorContentSlot === slot) return
     (slot.parent as? ViewGroup)?.removeView(slot)
     val classicIndex = twoLevelHeader.indexOfChild(insetRefreshHeader)
@@ -407,12 +415,13 @@ internal class ExpoSmartSecondFloorLayoutView(
     val canOpenFloor = secondFloorEnabled && floorSlot != null
     twoLevelHeader.setEnableRefresh(refreshEnabled)
     twoLevelHeader.setEnableTwoLevel(canOpenFloor)
-    // The parent must remain enabled for TwoLevelHeader to receive its native
-    // close gestures even when ordinary refresh has been disabled.
+    // 即使普通刷新关闭，父布局也必须保持可用，TwoLevelHeader 才能继续收到原生关闭手势。
     refreshLayout.setEnableRefresh(headerReady && hasContent && (refreshEnabled || canOpenFloor))
   }
 
   private fun applyTwoLevelConfiguration() {
+    // 三个阈值必须满足 refreshRate < floorRate < maxRate。分别归一化并保留最小间隔，
+    // 可防止 NaN、无穷大或错误顺序让 SmartRefreshLayout 进入无法释放的状态。
     val maxRate = clampFinite(requestedMaxRate, DEFAULT_MAX_RATE, MIN_MAX_RATE, MAX_MAX_RATE)
     val floorRate = clampFinite(
       requestedFloorRate,
@@ -441,8 +450,7 @@ internal class ExpoSmartSecondFloorLayoutView(
       .setFloorDuration(floorDuration)
       .setEnablePullToCloseTwoLevel(pullToCloseEnabled)
       .setBottomPullUpToCloseRate(bottomPullUpToCloseRate)
-    // TwoLevelHeader's own refreshRate participates in the transition back
-    // from the floor threshold. The layout trigger controls ordinary refresh.
+    // TwoLevelHeader 自己的 refreshRate 参与从二楼阈值退回的转换；父布局 trigger 才控制普通刷新。
     refreshLayout.setHeaderTriggerRate(refreshRate)
   }
 
@@ -476,6 +484,7 @@ internal class ExpoSmartSecondFloorLayoutView(
   }
 
   private fun scheduleRefresh(operation: RefreshOperation, delayMs: Int) {
+    // scheduledRefresh 与 activeRefresh 是实例级请求锁；二楼活动期间也不能并发开始普通刷新。
     if (
       operation.requestId <= 0 ||
       activeRefresh != null ||
@@ -552,12 +561,14 @@ internal class ExpoSmartSecondFloorLayoutView(
   }
 
   private fun allocateGestureRequestId(): Int {
+    // 手势请求使用负数，与 JS 命令使用的正数 requestId 隔离，便于精确匹配结束命令。
     val current = nextGestureRequestId
     nextGestureRequestId = if (current == Int.MIN_VALUE) -1 else current - 1
     return current
   }
 
   private fun postDelayedTracked(delayMs: Int, action: () -> Unit) {
+    // 记录所有延迟任务，Fabric 卸载视图时统一取消，避免回调触碰已销毁的原生层级。
     lateinit var runnable: Runnable
     runnable = Runnable {
       delayedCallbacks.remove(runnable)
@@ -568,9 +579,8 @@ internal class ExpoSmartSecondFloorLayoutView(
   }
 
   private fun reconcileChildOrder() {
-    // TwoLevelHeader changes to MatchLayout after attachment. Keeping React
-    // content in front is what hides the full-screen floor until the native
-    // kernel translates that content during the opening gesture.
+    // TwoLevelHeader 挂载后会变成 MatchLayout。React 内容保持在前方，才能在内核随打开手势
+    // 平移内容之前遮住全屏二楼背景。
     contentSlot?.let(refreshLayout::bringChildToFront)
     twoLevelHeader.bringChildToFront(insetRefreshHeader)
   }
@@ -579,8 +589,7 @@ internal class ExpoSmartSecondFloorLayoutView(
     val floor = floorSlot ?: return
     if (floor.height == 0 || height == 0) return
     currentHeaderOffset = offset.coerceAtLeast(0)
-    // Keep the revealed backdrop aligned with the content below an overlay
-    // toolbar. The inset is part of the header's visible pull range.
+    // 让露出的背景与悬浮工具栏下方的内容对齐；header inset 本身就是可见下拉范围的一部分。
     val top = minOf(
       currentHeaderOffset - floor.height + dpToPx(requestedHeaderInsetDp),
       height - floor.height,
@@ -627,8 +636,7 @@ internal class ExpoSmartSecondFloorLayoutView(
         beginGestureRefresh()
       }
 
-      // OnMultiListener extends OnRefreshLoadMoreListener even when loading
-      // more is disabled for the second-floor layout.
+      // 二楼布局虽禁用加载更多，但 OnMultiListener 接口继承了加载监听，因此仍需提供空实现。
       override fun onLoadMore(refreshLayout: RefreshLayout) = Unit
 
       override fun onStateChanged(
@@ -706,9 +714,8 @@ internal class ExpoSmartSecondFloorLayoutView(
       }
       RefreshState.TwoLevelReleased -> {
         lifecycle = SecondFloorLifecycle.OPENING
-        // The official demo starts the content cross-fade while the floor
-        // expansion runs. Its default 1000ms floor duration uses a 2000ms
-        // content fade, so retain that relationship for custom durations.
+        // 官方效果会在二楼展开时同步开始内容淡入，默认 1000ms 展开对应 2000ms 淡入；
+        // 自定义时长也保持这一比例，避免内容突兀出现。
         animateFloorContent(1f, configuredFloorDuration() * 2)
       }
       RefreshState.TwoLevel -> {
@@ -761,14 +768,15 @@ internal class ExpoSmartSecondFloorLayoutView(
   }
 
   private fun clampFinite(value: Float, fallback: Float, minimum: Float, maximum: Float): Float {
+    // coerceIn 无法修复 NaN，需先回退默认值，再进行上下界约束。
     val finiteValue = if (value.isFinite()) value else fallback
     return finiteValue.coerceIn(minimum, maximum)
   }
 
   private class ConfiguredTwoLevelHeader(context: Context) : TwoLevelHeader(context) {
     fun requestHeaderRemeasure() {
-      // SmartRefreshLayout caches its measured header height. Reset the
-      // TwoLevelHeader copy too so an inset update recomputes drag thresholds.
+      // SmartRefreshLayout 会缓存测量后的 Header 高度；同时清空 TwoLevelHeader 的副本，
+      // 才能在 inset 变化后重新计算拖拽阈值。
       mHeaderHeight = 0
       mRefreshKernel?.requestRemeasureHeightFor(this)
       requestLayout()
@@ -784,10 +792,8 @@ internal class ExpoSmartSecondFloorLayoutView(
       if (wrappedHeader?.spinnerStyle == SpinnerStyle.Translate) {
         val params = wrappedHeader.view.layoutParams as? ViewGroup.MarginLayoutParams
         if (params != null) {
-          // The library subtracts the header height from this margin during
-          // its first initialization. The explicit layout below owns that
-          // translate position, so retain a neutral margin across Fabric
-          // remeasures instead of allowing it to accumulate or be discarded.
+          // 库首次初始化时会从该 margin 中减去 Header 高度，而下方显式布局已经负责 Translate 位置。
+          // 因此 Fabric 重测时始终恢复零 margin，避免偏移累计或丢失。
           params.topMargin = 0
           wrappedHeader.view.layoutParams = params
         }
@@ -804,10 +810,8 @@ internal class ExpoSmartSecondFloorLayoutView(
       val effectiveHeight = if (mHeaderHeight > 0) mHeaderHeight else headerView.measuredHeight
       if (effectiveHeight <= 0) return
 
-      // TwoLevelHeader applies moveSpinner(offset) to this child. It must
-      // therefore start exactly one effective header height above the host:
-      // at offset=0 the inset and Classic content are hidden; at the refresh
-      // threshold the Classic content is exposed below the fixed toolbar.
+      // TwoLevelHeader 会对该子节点执行 moveSpinner(offset)，所以初始位置必须恰好在容器上方一个
+      // 有效 Header 高度：offset=0 时隐藏 inset 和 Classic 内容，到刷新阈值时才露出固定工具栏下方。
       val params = headerView.layoutParams as? ViewGroup.MarginLayoutParams
       val childLeft = params?.leftMargin ?: 0
       headerView.layout(

@@ -5,17 +5,35 @@ import type { NativeRefreshState } from './NativeSmartRefreshLayout';
 import type { RequestSource } from './NativeSmartRefreshLayout';
 
 export type RefreshState = NativeRefreshState;
+/** 加载更多触发方式：手动上拉或达到边界后自动触发。 */
 export type LoadMoreMode = 'pull' | 'auto';
 /** Classic header motion modes supported on Android and iOS. */
 export type ClassicSpinnerStyle = 'scale' | 'translate' | 'fixed-behind';
 
 export interface RefreshRequest {
+  /** 与原生请求/完成命令配对的序列号。 */
   requestId: number;
+  /** 请求来自用户手势还是 ref 命令。 */
   source: RequestSource;
 }
 
 export interface LoadMoreResult {
+  /** false 会让原生 footer 进入 no-more-data 状态。 */
   hasMore: boolean;
+}
+
+/** Native pull-distance information for a custom refresh header. */
+export interface HeaderMovingEvent {
+  /** Pull distance relative to the refresh trigger threshold. */
+  percent: number;
+  /** Current header pull distance in device-independent pixels. */
+  offset: number;
+  /** Native header height in device-independent pixels. */
+  height: number;
+  /** Maximum pull distance in device-independent pixels. */
+  maxDragHeight: number;
+  /** Whether the user is actively dragging the scroll view. */
+  isDragging: boolean;
 }
 
 export interface RefreshMessages {
@@ -31,6 +49,8 @@ export interface RefreshMessages {
 
 export interface SmartRefreshLayoutProps extends ViewProps {
   children: ReactElement;
+  /** React content mounted inside the native refresh header. */
+  refreshHeader?: ReactElement;
   refreshEnabled?: boolean;
   loadMoreEnabled?: boolean;
   loadMoreMode?: LoadMoreMode;
@@ -66,14 +86,18 @@ export interface SmartRefreshLayoutProps extends ViewProps {
   onRefreshError?: (error: unknown) => void;
   onLoadMoreError?: (error: unknown) => void;
   onStateChange?: (state: RefreshState) => void;
+  onHeaderMoving?: (event: HeaderMovingEvent) => void;
 }
 
 export interface FinishRefreshOptions {
+  /** 原生完成动画显示成功或失败状态。 */
   success?: boolean;
+  /** 延迟清除请求锁和结束动画的毫秒数。 */
   delay?: number;
 }
 
 export interface FinishLoadMoreOptions extends FinishRefreshOptions {
+  /** 本次结果是否仍有下一页数据。 */
   hasMore?: boolean;
 }
 

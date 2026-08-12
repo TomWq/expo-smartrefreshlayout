@@ -31,9 +31,25 @@
     "clean": "rimraf lib build android/build ios/build generated",
     "codegen": "node node_modules/react-native/scripts/generate-codegen-artifacts.js -p . -t all -s library -o generated",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "jest",
+    "test": "jest --watchman=false",
     "prepare": "bob build",
-    "prepack": "npm run typecheck"
+    "prepack": "npm run typecheck",
+    "pack:dry-run": "npm pack --dry-run",
+    "npm:login": "npm login --auth-type=web --registry=https://registry.npmjs.org/",
+    "release:guard": "node scripts/release-guard.js",
+    "release:check": "npm run release:guard && npm run typecheck && npm test && npm run build && npm run pack:dry-run && npm run release:guard",
+    "preversion": "npm run release:guard",
+    "publish:dry-run": "node scripts/publish-dry-run.js",
+    "publish:npm": "npm publish --access public --registry=https://registry.npmjs.org/",
+    "publish:alpha": "npm publish --tag alpha --access public --registry=https://registry.npmjs.org/",
+    "release:patch": "npm run release:check && node scripts/release-version.js patch && npm run publish:npm",
+    "release:minor": "npm run release:check && node scripts/release-version.js minor && npm run publish:npm",
+    "release:major": "npm run release:check && node scripts/release-version.js major && npm run publish:npm",
+    "release:alpha": "npm run release:check && npm version prerelease --preid=alpha && npm run publish:alpha"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "codegenConfig": {
     "name": "ExpoSmartRefreshLayoutSpec",
@@ -44,7 +60,8 @@
     },
     "ios": {
       "componentProvider": {
-        "ExpoSmartRefreshLayoutView": "ExpoSmartRefreshLayoutView"
+        "ExpoSmartRefreshLayoutView": "ExpoSmartRefreshLayoutView",
+        "ExpoSmartRefreshHeaderSlot": "ExpoSmartRefreshHeaderSlotView"
       }
     }
   },

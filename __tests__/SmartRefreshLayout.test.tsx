@@ -28,6 +28,13 @@ jest.mock('../src/NativeSmartRefreshLayout', () => {
   };
 });
 
+jest.mock('../src/NativeSmartRefreshHeaderSlot', () => {
+  const React = require('react');
+  return function NativeSmartRefreshHeaderSlot(props: object) {
+    return React.createElement('NativeSmartRefreshHeaderSlot', props);
+  };
+});
+
 const mockedCommands = Commands as jest.Mocked<typeof Commands>;
 
 function ScrollContent() {
@@ -278,6 +285,32 @@ it('only exposes auto loading as an explicit mode and does not trigger it on mou
 
   expect(nativeView.props.autoLoadMoreEnabled).toBe(true);
   expect(onLoadMore).not.toHaveBeenCalled();
+});
+
+it('mounts custom header content in the native slot and forwards header movement', async () => {
+  const onHeaderMoving = jest.fn();
+  const refreshHeader = React.createElement('mock-refresh-header');
+  const renderer = await renderLayout({ refreshHeader, onHeaderMoving });
+  const nativeView = renderer.root.findByType(NativeSmartRefreshLayout);
+  const headerSlot = renderer.root.findByType('NativeSmartRefreshHeaderSlot');
+  const movement = {
+    percent: 0.75,
+    offset: 60,
+    height: 80,
+    maxDragHeight: 160,
+    isDragging: true,
+  };
+
+  expect(headerSlot.props).toEqual(
+    expect.objectContaining({ collapsable: false })
+  );
+  expect(headerSlot.findByType('mock-refresh-header')).toBeDefined();
+
+  await act(async () => {
+    nativeView.props.onHeaderMoving({ nativeEvent: movement });
+  });
+
+  expect(onHeaderMoving).toHaveBeenCalledWith(movement);
 });
 
 it('forwards the official Classic header configuration to the native component', async () => {

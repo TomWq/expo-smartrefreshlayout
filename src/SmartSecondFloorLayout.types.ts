@@ -9,7 +9,9 @@ import type {
 export type SecondFloorState = NativeSecondFloorState;
 
 export interface SecondFloorRefreshRequest {
+  /** 与原生事件及 finishRefresh 命令配对的序列号。 */
   requestId: number;
+  /** 请求来源，便于区分手势刷新和程序化刷新。 */
   source: RequestSource;
 }
 
@@ -61,7 +63,9 @@ export interface SmartSecondFloorLayoutProps extends ViewProps {
 }
 
 export interface FinishSecondFloorRefreshOptions {
+  /** 原生刷新头显示成功或失败结果。 */
   success?: boolean;
+  /** 延迟释放刷新请求锁的毫秒数。 */
   delay?: number;
 }
 

@@ -13,6 +13,7 @@ import { SmartRefreshLayout } from 'expo-smartrefreshlayout';
 | 属性 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- |
 | `children` | `ReactElement` | 必填 | 唯一的滚动子组件 |
+| `refreshHeader` | `ReactElement` | - | 挂载到原生刷新 Header 内的自定义 React 内容 |
 | `refreshEnabled` | `boolean` | 是否提供 `onRefresh` | 是否允许下拉刷新 |
 | `loadMoreEnabled` | `boolean` | 是否提供 `onLoadMore` | 是否允许上拉加载 |
 | `loadMoreMode` | `'pull' | 'auto'` | `'pull'` | `pull` 需要上拉释放；`auto` 需要先真实向上滚动且内容超过一屏 |
@@ -36,6 +37,7 @@ import { SmartRefreshLayout } from 'expo-smartrefreshlayout';
 | `onRefreshError` | `(error: unknown) => void` | - | `onRefresh` 抛错后的通知 |
 | `onLoadMoreError` | `(error: unknown) => void` | - | `onLoadMore` 抛错后的通知 |
 | `onStateChange` | `(state: RefreshState) => void` | - | 原生刷新状态变化 |
+| `onHeaderMoving` | `(event: HeaderMovingEvent) => void` | - | Header 下拉距离变化；适合驱动自定义 Header 动画 |
 
 其余 `ViewProps` 会传给原生容器。
 
@@ -93,6 +95,26 @@ Android，iOS 会忽略但仍可安全传入。
 
 自动模式不会在首次挂载、短列表或仅仅因为 footer 出现时触发。Android 和 iOS 都要求内容超过一屏，并先检测到用户向上滚动；请求完成后需要下一次向上滚动才会再次解锁自动加载。
 
+### 自定义刷新 Header
+
+`refreshHeader` 会把 React 内容挂载到两端原生刷新 Header 中，而不是作为列表内容的普通兄弟节点。它的固定逻辑高度为 `80`，可通过内容自身的布局填充该区域。`onHeaderMoving` 的距离字段均为逻辑像素（dp/pt），`percent` 达到 `1` 时表示到达刷新阈值。
+
+```tsx
+const [headerProgress, setHeaderProgress] = useState(0);
+
+<SmartRefreshLayout
+  refreshHeader={<MyLottieHeader progress={headerProgress} />}
+  onHeaderMoving={({ percent }) => {
+    setHeaderProgress(Math.min(Math.max(percent, 0), 1));
+  }}
+  onRefresh={reload}
+>
+  <FlatList {...listProps} />
+</SmartRefreshLayout>
+```
+
+自定义 Header 内的交互视图仍由 React 管理；需要让下拉手势优先通过时，可给纯展示内容设置 `pointerEvents="none"`。
+
 ### RefreshMessages
 
 ```ts
@@ -118,6 +140,14 @@ interface RefreshRequest {
 
 interface LoadMoreResult {
   hasMore: boolean;
+}
+
+interface HeaderMovingEvent {
+  percent: number;
+  offset: number;
+  height: number;
+  maxDragHeight: number;
+  isDragging: boolean;
 }
 ```
 

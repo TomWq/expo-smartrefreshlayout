@@ -19,6 +19,7 @@ export type NativeSecondFloorState =
   | 'second-floor'
   | 'second-floor-closing';
 
+// 二楼原生状态同时覆盖普通刷新和展开/关闭动画阶段。
 export type RequestSource = 'gesture' | 'programmatic';
 
 export type RequestEvent = Readonly<{
@@ -26,11 +27,13 @@ export type RequestEvent = Readonly<{
   source: string;
 }>;
 
+// 未知状态由上层归一化为 idle，再交给业务回调。
 export type StateChangeEvent = Readonly<{
   state: string;
 }>;
 
 export interface NativeProps extends ViewProps {
+  // 比例、时长和 inset 在 JS 层已归一化；WithDefault 负责 Fabric 初始默认值。
   refreshEnabled?: CodegenTypes.WithDefault<boolean, true>;
   refreshing?: CodegenTypes.WithDefault<boolean, false>;
   hapticsEnabled?: CodegenTypes.WithDefault<boolean, true>;
@@ -61,6 +64,7 @@ export interface NativeProps extends ViewProps {
 
 type NativeComponent = HostComponent<NativeProps>;
 
+// 刷新完成仍需 requestId；展开/关闭命令没有请求 id，因为由原生状态机串行处理。
 interface NativeCommands {
   beginRefresh: (
     viewRef: React.ElementRef<NativeComponent>,
@@ -86,6 +90,7 @@ export const Commands = codegenNativeCommands<NativeCommands>({
   ],
 });
 
+// Android-only Fabric 组件；iOS 平台由 codegen 明确排除。
 export default codegenNativeComponent<NativeProps>(
   'ExpoSmartSecondFloorLayoutView',
   { excludedPlatforms: ['iOS'] }

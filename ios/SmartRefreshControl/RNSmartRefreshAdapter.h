@@ -14,10 +14,9 @@ typedef void (^RNSmartFooterStatusChanged)(UISmartFooterStatus oldStatus, UISmar
 typedef void (^RNSmartFooterScrollChanged)(CGFloat offset, CGFloat percent, BOOL isDragging);
 
 /**
- * The Android ClassicsHeader spinner styles have direct geometry equivalents
- * in a UIScrollView-backed control. Translate follows the pulled content,
- * Scale grows only through the revealed distance, and FixedBehind stays
- * pinned behind the content while it moves away from the top edge.
+ * Android ClassicsHeader 的 spinnerStyle 在 UIScrollView 控件中的几何映射：
+ * Translate 跟随被下拉的内容移动；Scale 只按已经露出的距离增长；
+ * FixedBehind 固定在内容后方，由内容离开顶部后逐渐显露。
  */
 typedef NS_ENUM(NSInteger, RNSmartClassicSpinnerStyle) {
   RNSmartClassicSpinnerStyleScale,
@@ -26,9 +25,9 @@ typedef NS_ENUM(NSInteger, RNSmartClassicSpinnerStyle) {
 };
 
 /**
- * Thin callback/text adapters around the vendored SmartRefreshControl views.
- * The Fabric bridge owns request IDs and operation state; these classes only
- * expose lifecycle callbacks and keep the stock visuals in sync with RN text.
+ * 对内置 SmartRefreshControl 视图的轻量回调/文案适配层。
+ * requestId 和请求状态由 Fabric 桥接视图管理；这里仅透传生命周期回调，
+ * 并把原生视觉状态与 React Native 传入的文案保持同步。
  */
 @interface RNSmartClassicsHeader : UIRefreshClassicsHeader
 
@@ -62,7 +61,7 @@ typedef NS_ENUM(NSInteger, RNSmartClassicSpinnerStyle) {
 @property (nonatomic, copy) NSString *loadingMoreText;
 @property (nonatomic, copy) NSString *noMoreDataText;
 
-/** Automatic footers stay dormant until a forward drag arms them. */
+/** 自动加载 Footer 默认锁定，只有用户向上拖动后才允许发起请求。 */
 @property (nonatomic, assign) BOOL automaticRequestsArmed;
 
 - (void)beginProgrammaticLoadMore;

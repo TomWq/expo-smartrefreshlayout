@@ -43,8 +43,11 @@ const MAX_FLOOR_DURATION = 10_000;
 const MAX_HEADER_INSET = 10_000;
 
 type RefreshOperation = {
+  /** 原生请求事件回传的 id；完成命令必须匹配它。 */
   requestId: number;
+  /** 是否已接收匹配事件，防止同一请求重复触发回调。 */
   started: boolean;
+  /** 已发出收尾命令；延迟期间忽略过期事件。 */
   finishing: boolean;
 };
 
@@ -85,6 +88,8 @@ function normalizeConfiguration({
   | 'bottomPullUpToCloseRate'
   | 'headerInset'
 >): NormalizedConfiguration {
+  /* 二楼组件依赖多个有序比例。先限制 maxRate，再用它约束 floorRate，
+   * 最后约束 refreshRate，确保三者始终保持安全间隔。 */
   const normalizedMaxRate = clamp(finiteOr(maxRate, 2.5), MIN_MAX_RATE, MAX_MAX_RATE);
   const normalizedFloorRate = clamp(
     finiteOr(floorRate, 1.9),
@@ -101,6 +106,7 @@ function normalizeConfiguration({
     maxRate: normalizedMaxRate,
     floorRate: normalizedFloorRate,
     refreshRate: normalizedRefreshRate,
+    /* 原生动画时长和顶部 inset 也限制在有限范围，避免异常输入传入 Fabric。 */
     floorDuration: clamp(
       Math.round(finiteOr(floorDuration, 1000)),
       0,
@@ -124,10 +130,12 @@ function normalizeSource(source: string): SecondFloorRefreshRequest['source'] {
 }
 
 function isSecondFloorActive(state: SecondFloorState): boolean {
+  // opening/open/closing 状态与普通刷新互斥。
   return state !== 'idle' && state !== 'pulling' && state !== 'ready' && state !== 'refreshing';
 }
 
 function toSecondFloorState(state: string): SecondFloorState {
+  // Fabric 事件携带字符串；未知值降级为空闲，避免把非法状态扩散给业务层。
   const knownStates: NativeSecondFloorState[] = [
     'idle',
     'pulling',
@@ -177,6 +185,7 @@ export const SmartSecondFloorLayout = forwardRef<
   forwardedRef
 ) {
   if (Platform.OS !== 'android') {
+    // TwoLevelHeader 仅存在于 Android，iOS 渲染前直接给出明确错误。
     throw new Error(
       'SmartSecondFloorLayout is Android-only because iOS has no native TwoLevelHeader equivalent.'
     );
@@ -201,6 +210,7 @@ export const SmartSecondFloorLayout = forwardRef<
     headerInset,
   });
 
+  /** 为 JS 发起的刷新命令分配 Fabric Int32 范围内的请求 id。 */
   const allocateProgrammaticRequestId = useCallback(() => {
     const current = nextProgrammaticRequestIdRef.current;
     nextProgrammaticRequestIdRef.current =
@@ -215,6 +225,7 @@ export const SmartSecondFloorLayout = forwardRef<
         return;
       }
 
+      /* 先锁定再发送完成命令；delay > 0 时保持锁到动画结束，防止旧命令收尾新请求。 */
       operation.finishing = true;
       const delay = normalizeDelay(options.delay);
       const clearOperation = () => {
@@ -224,6 +235,7 @@ export const SmartSecondFloorLayout = forwardRef<
         finishTimerRef.current = null;
       };
 
+      /* 非受控模式由本组件清除状态；受控模式等待父组件关闭 refreshing prop。 */
       if (controlledRefreshing === undefined) {
         setInternalRefreshing(false);
       }
@@ -246,6 +258,7 @@ export const SmartSecondFloorLayout = forwardRef<
   );
 
   useEffect(() => {
+    /* 受控刷新在 true -> false 的下降沿完成，初始 false 不会触发收尾。 */
     if (
       previousControlledRefreshingRef.current === true &&
       controlledRefreshing === false
@@ -258,6 +271,7 @@ export const SmartSecondFloorLayout = forwardRef<
   useEffect(() => {
     mountedRef.current = true;
     return () => {
+      /* 清理延迟收尾和本地状态锁，避免卸载后的异步回调影响新实例。 */
       mountedRef.current = false;
       if (finishTimerRef.current !== null) {
         clearTimeout(finishTimerRef.current);
@@ -271,6 +285,7 @@ export const SmartSecondFloorLayout = forwardRef<
     forwardedRef,
     () => ({
       beginRefresh: (delay = 0) => {
+        /* 刷新请求与二楼展开互斥；命令成功派发后才返回 true。 */
         if (
           !mountedRef.current ||
           refreshOperationRef.current !== null ||
@@ -292,6 +307,7 @@ export const SmartSecondFloorLayout = forwardRef<
         finishRefreshOperation(options);
       },
       openSecondFloor: () => {
+        /* 只有挂载且空闲时允许展开，展开中状态立即写入本地锁。 */
         if (
           !mountedRef.current ||
           nativeRef.current === null ||
@@ -306,6 +322,7 @@ export const SmartSecondFloorLayout = forwardRef<
         return true;
       },
       closeSecondFloor: () => {
+        /* 仅允许从已展开/展开中的状态关闭，避免重复派发关闭命令。 */
         if (
           !mountedRef.current ||
           nativeRef.current === null ||
@@ -324,6 +341,7 @@ export const SmartSecondFloorLayout = forwardRef<
 
   const handleRefresh = useCallback(
     async (event: NativeSyntheticEvent<RequestEvent>) => {
+      /* 二楼打开、展开或关闭期间不接受普通刷新事件。 */
       if (isSecondFloorActive(secondFloorStateRef.current)) {
         return;
       }
@@ -335,6 +353,7 @@ export const SmartSecondFloorLayout = forwardRef<
       const current = refreshOperationRef.current;
       if (current !== null) {
         if (current.requestId !== request.requestId || current.started || current.finishing) {
+          // id 不匹配表示过期事件，立即结束它，不让它调用业务回调。
           if (current.requestId !== request.requestId && nativeRef.current) {
             Commands.finishRefresh(nativeRef.current, request.requestId, true, 0);
           }
@@ -350,6 +369,7 @@ export const SmartSecondFloorLayout = forwardRef<
       }
 
       if (controlledRefreshing === undefined) {
+        // 非受控模式由组件反映 refreshing；受控模式由父组件提供该状态。
         setInternalRefreshing(true);
       }
 
@@ -366,6 +386,8 @@ export const SmartSecondFloorLayout = forwardRef<
           !operation.finishing &&
           controlledRefreshing === undefined
         ) {
+          /* 非受控回调在 finally 中发送成功/失败结果；受控模式保留操作锁，
+           * 等待父组件把 refreshing 设为 false。 */
           setInternalRefreshing(false);
           refreshOperationRef.current = null;
           if (nativeRef.current) {
@@ -379,6 +401,7 @@ export const SmartSecondFloorLayout = forwardRef<
 
   const handleStateChange = useCallback(
     (event: NativeSyntheticEvent<StateChangeEvent>) => {
+      // 将原生字符串归一化后再暴露给业务，保证状态属于公开联合类型。
       const state = toSecondFloorState(event.nativeEvent.state);
       secondFloorStateRef.current = state;
       onStateChange?.(state);
@@ -387,11 +410,13 @@ export const SmartSecondFloorLayout = forwardRef<
   );
 
   const handleSecondFloorOpen = useCallback(() => {
+    // 原生动画完成后才把本地状态推进为已展开。
     secondFloorStateRef.current = 'second-floor';
     onSecondFloorOpen?.();
   }, [onSecondFloorOpen]);
 
   const handleSecondFloorClose = useCallback(() => {
+    // 原生关闭完成后恢复空闲，解除与刷新的互斥。
     secondFloorStateRef.current = 'idle';
     onSecondFloorClose?.();
   }, [onSecondFloorClose]);

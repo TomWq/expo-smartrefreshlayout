@@ -17,6 +17,7 @@ export type NativeRefreshState =
   | 'loading'
   | 'no-more-data';
 
+// 原生事件使用 requestId 与 JS 完成命令配对；source 区分手势和 ref 调用。
 export type RequestSource = 'gesture' | 'programmatic';
 
 export type RequestEvent = Readonly<{
@@ -24,11 +25,21 @@ export type RequestEvent = Readonly<{
   source: string;
 }>;
 
+// 状态事件保留字符串形态，由上层组件负责归一化到公开状态联合类型。
 export type StateChangeEvent = Readonly<{
   state: string;
 }>;
 
+export type HeaderMovingEvent = Readonly<{
+  percent: CodegenTypes.Float;
+  offset: CodegenTypes.Int32;
+  height: CodegenTypes.Int32;
+  maxDragHeight: CodegenTypes.Int32;
+  isDragging: boolean;
+}>;
+
 export interface NativeProps extends ViewProps {
+  // Fabric WithDefault 会在原生侧补默认值，避免 JS 与 Android/iOS 默认配置分叉。
   refreshEnabled?: CodegenTypes.WithDefault<boolean, true>;
   loadMoreEnabled?: CodegenTypes.WithDefault<boolean, false>;
   autoLoadMoreEnabled?: CodegenTypes.WithDefault<boolean, false>;
@@ -59,10 +70,12 @@ export interface NativeProps extends ViewProps {
   onRefresh?: CodegenTypes.DirectEventHandler<RequestEvent>;
   onLoadMore?: CodegenTypes.DirectEventHandler<RequestEvent>;
   onStateChange?: CodegenTypes.DirectEventHandler<StateChangeEvent>;
+  onHeaderMoving?: CodegenTypes.DirectEventHandler<HeaderMovingEvent>;
 }
 
 type NativeComponent = HostComponent<NativeProps>;
 
+// 命令参数必须包含 requestId；原生据此丢弃过期的完成命令。
 interface NativeCommands {
   beginRefresh: (
     viewRef: React.ElementRef<NativeComponent>,
@@ -100,6 +113,7 @@ export const Commands = codegenNativeCommands<NativeCommands>({
   ],
 });
 
+// Fabric 原生组件声明；事件和命令由 codegen 生成跨平台调用封装。
 export default codegenNativeComponent<NativeProps>(
   'ExpoSmartRefreshLayoutView'
 );

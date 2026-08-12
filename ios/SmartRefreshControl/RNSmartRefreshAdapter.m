@@ -20,15 +20,13 @@
   }
 
   _classicSpinnerStyle = classicSpinnerStyle;
-  // Move is the stock implementation used by Translate. Stretch avoids the
-  // stock layout pass resetting the custom Scale/FixedBehind frame to -height;
-  // the actual geometry is supplied by -adjustFrameWithHeight:... below.
+  // Translate 直接沿用原生 Move 实现。Scale/FixedBehind 选用 Stretch，是为了
+  // 避免原生布局把自定义 frame 重置到 -height；实际几何由下方 adjustFrame 提供。
   self.scrollMode = classicSpinnerStyle == RNSmartClassicSpinnerStyleTranslate
       ? UISmartScrollModeMove
       : UISmartScrollModeStretch;
-  // FixedBehind keeps the header at the front-positioned geometry selected by
-  // the bridge, but still needs an expanded inset so the scroll content moves
-  // down and exposes the header from behind.
+  // FixedBehind 保持桥接层选定的前置几何位置，但仍需扩展 contentInset，
+  // 让滚动内容下移并从后方露出 Header。
   self.expandsContentInset =
       classicSpinnerStyle == RNSmartClassicSpinnerStyleFixedBehind;
   self.clipsToBounds = classicSpinnerStyle == RNSmartClassicSpinnerStyleScale;
@@ -63,9 +61,8 @@
     return;
   }
 
-  // The scroll view's visual coordinate is frame.origin.y - contentOffset.y.
-  // Exclude the header's own expanded inset when anchoring the frame: that
-  // inset moves the content down, but must not move the header down with it.
+  // 滚动视图中的可视坐标为 frame.origin.y - contentOffset.y。锚定 Header 时要
+  // 排除 Header 自身扩展的 inset：它只应把内容下移，不能同时把 Header 下移。
   CGFloat fullHeight = MAX(expandHeight, 1);
   CGFloat contentInsetTop = insetTop - (isExpanded ? fullHeight : 0);
   CGFloat pullDistance = MAX(0, -offset - contentInsetTop);
@@ -93,6 +90,8 @@
 
 - (void)applyTextForStatus:(UIRefreshStatus)status
 {
+  // 将第三方 Header 状态映射到 JS 配置的四组文案。Finish/Idle 期间只有成功
+  // 完成且配置了完成文案时才暂时保留 refreshCompleteText。
   NSString *text = self.pullDownText;
   switch (status) {
     case UIRefreshStatusReleaseToRefresh:
@@ -128,8 +127,8 @@
   UIScrollView *scrollView = self.scrollView;
   if (scrollView != nil &&
       self.classicSpinnerStyle == RNSmartClassicSpinnerStyleFixedBehind) {
-    // FixedBehind is revealed by its expanded content inset; moving it above
-    // the scroll content changes it into Translate during the refresh state.
+    // FixedBehind 依靠扩展 inset 从内容后方显露。始终放到滚动内容背后，
+    // 否则进入刷新态后视觉效果会退化成 Translate。
     [scrollView sendSubviewToBack:self];
   }
   [self applyTextForStatus:status];
@@ -191,14 +190,16 @@
 - (void)setUpComponent
 {
   [super setUpComponent];
-  // UIRefreshClassicsFooter defaults to auto mode. The RN prop opts in to it
-  // explicitly, so a regular pull footer never receives a stray tap target.
+  // UIRefreshClassicsFooter 默认开启自动加载，RN API 则要求显式启用。
+  // 因此初始关闭 auto，避免普通上拉 Footer 意外获得自动触发入口。
   self.isAutoLoadMore = NO;
   self.automaticRequestsArmed = NO;
 }
 
 - (void)beginLoadMore
 {
+  // auto 模式只有在用户真实向上拖动解锁后才能由底层触发；实例命令通过
+  // forceProgrammaticBegin 临时旁路该限制，但不会永久解锁自动加载。
   if (self.isAutoLoadMore && !self.automaticRequestsArmed && !self.forceProgrammaticBegin) {
     return;
   }
@@ -222,6 +223,8 @@
              contentOffset:(CGPoint)newOffset
 {
   if (self.isAutoLoadMore && !self.automaticRequestsArmed) {
+    // 只在内容超过一屏且用户正在向上拖动时解锁。这样首次布局、短列表、
+    // contentSize 调整和程序化滚动都不会直接触发自动加载。
     UIEdgeInsets inset = scrollView.adjustedContentInset;
     BOOL contentExceedsViewport =
         scrollView.contentSize.height + inset.top + inset.bottom >
@@ -235,6 +238,7 @@
 
 - (void)applyTextForStatus:(UISmartFooterStatus)status
 {
+  // 将 Footer 的细粒度状态映射为上拉、释放、加载中和无更多数据四组文案。
   NSString *text = self.pullUpText;
   switch (status) {
     case UISmartFooterStatusReleaseToLoadMore:

@@ -27,6 +27,7 @@ internal class ExpoSmartSecondFloorLayoutViewManager :
   ): ExpoSmartSecondFloorLayoutView = ExpoSmartSecondFloorLayoutView(reactContext)
 
   override fun addView(parent: ExpoSmartSecondFloorLayoutView, child: View, index: Int) {
+    // 三种 Fabric 槽位需要被重新挂到不同原生父节点，由组件按类型完成真实挂载。
     parent.addReactChild(child, index)
   }
 
@@ -43,6 +44,7 @@ internal class ExpoSmartSecondFloorLayoutViewManager :
     reactContext: ThemedReactContext,
     view: ExpoSmartSecondFloorLayoutView,
   ) {
+    // 事件携带当前 SurfaceId，避免同一页面存在多个 Fabric Root 时被投递到错误根节点。
     fun emit(name: String, payload: com.facebook.react.bridge.WritableMap = Arguments.createMap()) {
       UIManagerHelper.getEventDispatcherForReactTag(reactContext, view.id)?.dispatchEvent(
         SmartRefreshEvent(UIManagerHelper.getSurfaceId(view), view.id, name, payload),
@@ -63,6 +65,7 @@ internal class ExpoSmartSecondFloorLayoutViewManager :
   }
 
   override fun onDropViewInstance(view: ExpoSmartSecondFloorLayoutView) {
+    // dispose 会取消延迟刷新并清空事件闭包，必须先于基类释放原生 View。
     view.dispose()
     super.onDropViewInstance(view)
   }
@@ -126,6 +129,7 @@ internal class ExpoSmartSecondFloorLayoutViewManager :
   override fun beginRefresh(view: ExpoSmartSecondFloorLayoutView, requestId: Int, delayMs: Int) =
     view.beginRefresh(requestId, delayMs)
 
+  // 所有命令都由 Codegen 定位到组件实例；刷新结束仍依靠 requestId 防止旧命令覆盖新请求。
   override fun finishRefresh(
     view: ExpoSmartSecondFloorLayoutView,
     requestId: Int,
@@ -138,6 +142,7 @@ internal class ExpoSmartSecondFloorLayoutViewManager :
   override fun closeSecondFloor(view: ExpoSmartSecondFloorLayoutView) = view.closeSecondFloor()
 
   override fun getExportedCustomDirectEventTypeConstants(): MutableMap<String, Any> =
+    // top* 是原生直接事件名，registrationName 是 JS Props 上公开的回调名，两侧必须成对维护。
     mutableMapOf(
       "topRefresh" to mutableMapOf("registrationName" to "onRefresh"),
       "topStateChange" to mutableMapOf("registrationName" to "onStateChange"),

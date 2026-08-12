@@ -158,6 +158,27 @@ floorRef.current?.closeSecondFloor();
 </SmartRefreshLayout>
 ```
 
+### 自定义刷新 Header
+
+`refreshHeader` 会作为真实的原生 Header 挂载，因而可直接放入 `LottieView` 等 React Native
+内容。通过 `onHeaderMoving` 取得跨平台一致的下拉进度和逻辑像素距离：
+
+```tsx
+const [headerProgress, setHeaderProgress] = useState(0);
+
+<SmartRefreshLayout
+  refreshHeader={<MyLottieHeader progress={headerProgress} />}
+  onHeaderMoving={({ percent }) => {
+    setHeaderProgress(Math.min(Math.max(percent, 0), 1));
+  }}
+  onRefresh={refresh}
+>
+  <FlatList {...listProps} />
+</SmartRefreshLayout>
+```
+
+事件中的 `offset`、`height` 和 `maxDragHeight` 都是逻辑像素；`percent >= 1` 表示达到刷新阈值。自定义 Header 的逻辑高度为 `80`。
+
 ### Classic 与 Material Header 配置
 
 Android 使用 SmartRefreshLayout 官方 Classic/Material Header，iOS 使用本地维护的

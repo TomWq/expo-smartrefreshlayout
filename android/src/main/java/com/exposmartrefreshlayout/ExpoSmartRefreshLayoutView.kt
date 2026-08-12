@@ -17,6 +17,7 @@ import com.scwang.smart.refresh.layout.api.RefreshLayout
 import com.scwang.smart.refresh.layout.constant.RefreshState
 import com.scwang.smart.refresh.layout.constant.SpinnerStyle
 import com.scwang.smart.refresh.layout.listener.OnMultiListener
+import kotlin.math.roundToInt
 
 internal class ExpoSmartRefreshLayoutView(
   context: ThemedReactContext
@@ -29,14 +30,15 @@ internal class ExpoSmartRefreshLayoutView(
     val source: String
   )
 
-  // Keep the React content and SmartRefreshLayout's Header/Footer in one
-  // native ViewGroup. FixedBehind relies on that exact sibling relationship
-  // when it translates the content and clips the exposed Header region.
+  // React 内容必须与 SmartRefreshLayout 的 Header/Footer 保持在同一个原生 ViewGroup 中。
+  // FixedBehind 会依赖这种兄弟节点关系平移内容并裁剪 Header 的露出区域，因此这里不能再包一层容器。
   private val refreshLayout: SmartRefreshLayout
     get() = this
   private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
   private val delayedCallbacks = mutableSetOf<Runnable>()
+  private val reactChildren = mutableListOf<View>()
   private var reactChild: View? = null
+  private var headerSlot: ExpoSmartRefreshHeaderSlotView? = null
   private var header: RefreshHeader? = null
   private var footer: RefreshFooter? = null
   private var installedHeaderStyle: String? = null
@@ -77,6 +79,7 @@ internal class ExpoSmartRefreshLayoutView(
   var onRefresh: ((Int, String) -> Unit)? = null
   var onLoadMore: ((Int, String) -> Unit)? = null
   var onStateChange: ((String) -> Unit)? = null
+  var onHeaderMoving: ((Float, Int, Int, Int, Boolean) -> Unit)? = null
 
   init {
     refreshLayout.apply {
@@ -87,8 +90,7 @@ internal class ExpoSmartRefreshLayoutView(
       setEnableLoadMoreWhenContentNotFull(true)
       setEnableScrollContentWhenRefreshed(true)
       setEnableScrollContentWhenLoaded(true)
-      // Match the official Classics sample: FixedBehind is clipped to the
-      // revealed area while RefreshContent is translated out of its way.
+      // 与官方 Classics 示例保持一致：FixedBehind 只绘制在已露出的区域，内容则随拖拽让出空间。
       setEnableClipHeaderWhenFixedBehind(true)
       setHeaderMaxDragRate(2.0f)
       setHeaderTriggerRate(1.0f)
@@ -102,6 +104,8 @@ internal class ExpoSmartRefreshLayoutView(
   }
 
   override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+    // 自动加载不能仅凭“已经滚到底部”触发，否则首屏不足时布局阶段也可能误发请求。
+    // 只有用户真实向上滑过系统触摸阈值，且内容确实超过一屏，才临时放开库内的自动加载开关。
     if (autoLoadMoreEnabled && loadMoreEnabled && !noMoreData) {
       when (event.actionMasked) {
         MotionEvent.ACTION_DOWN -> touchStartY = event.y
@@ -119,9 +123,8 @@ internal class ExpoSmartRefreshLayoutView(
   }
 
   override fun dispatchDraw(canvas: Canvas) {
-    // SmartRefreshLayout disables child clipping by default. React Native's
-    // surrounding Views do not restore the XML parent's viewport clip, so a
-    // translated RefreshContent can otherwise paint over sibling controls.
+    // SmartRefreshLayout 默认关闭子节点裁剪，而 React Native 外层 View 不会补回 XML 父布局的视口裁剪。
+    // 因此必须在这里裁剪画布，避免被平移的 RefreshContent 绘制到相邻控件上。
     val saveCount = canvas.save()
     canvas.clipRect(0, 0, width, height)
     super.dispatchDraw(canvas)
@@ -129,26 +132,44 @@ internal class ExpoSmartRefreshLayoutView(
   }
 
   fun addReactChild(child: View, index: Int) {
-    check(reactChild == null) {
-      "SmartRefreshLayout accepts exactly one child. Wrap multiple views in a React Native View."
+    check(child is ExpoSmartRefreshHeaderSlotView || reactChild == null) {
+      "SmartRefreshLayout accepts one refreshHeader slot and one scroll-content child."
     }
-    check(index == 0) { "SmartRefreshLayout only supports a child at index 0." }
+    check(index in 0..reactChildren.size) {
+      "SmartRefreshLayout received an invalid child index."
+    }
+    if (reactChildren.contains(child)) return
+    reactChildren.add(index, child)
 
-    reactChild = child
-    // Do not use ViewGroup.addView here. SmartRefreshLayout needs this API to
-    // register mRefreshContent, remove an empty-content placeholder, and wire
-    // content translation/clipping for FixedBehind and Scale headers.
-    refreshLayout.setRefreshContent(child)
+    if (child is ExpoSmartRefreshHeaderSlotView) {
+      headerSlot = child
+      (child.parent as? ViewGroup)?.removeView(child)
+      requestHeaderRebuild()
+    } else {
+      reactChild = child
+      refreshLayout.setRefreshContent(child)
+    }
+    requestLayout()
   }
 
-  fun getReactChildCount(): Int = if (reactChild == null) 0 else 1
+  fun getReactChildCount(): Int = reactChildren.size
 
-  fun getReactChildAt(index: Int): View? = if (index == 0) reactChild else null
+  fun getReactChildAt(index: Int): View? = reactChildren.getOrNull(index)
 
   fun removeReactChild(index: Int) {
-    if (index != 0) return
-    reactChild?.let(refreshLayout::removeView)
-    reactChild = null
+    val child = reactChildren.getOrNull(index) ?: return
+    reactChildren.removeAt(index)
+    if (child is ExpoSmartRefreshHeaderSlotView) {
+      if (headerSlot === child) {
+        if (child.parent is ViewGroup) (child.parent as ViewGroup).removeView(child)
+        headerSlot = null
+        requestHeaderRebuild()
+      }
+    } else if (reactChild === child) {
+      refreshLayout.removeView(child)
+      reactChild = null
+    }
+    requestLayout()
   }
 
   fun setRefreshEnabled(value: Boolean) {
@@ -182,20 +203,16 @@ internal class ExpoSmartRefreshLayoutView(
         refreshLayout.autoRefreshAnimationOnly()
       }
     } else {
-      // React can commit the uncontrolled prop update before the matching
-      // finishRefresh command reaches Fabric. Keep the tracked operation until
-      // that command completes, otherwise its request id is rejected and a
-      // Translate header is closed before RefreshFinish can be displayed.
+      // Fabric 可能先提交非受控 refreshing=false，随后才送达对应的 finishRefresh 命令。
+      // 请求记录必须保留到命令完成，否则 requestId 会被拒绝，Translate Header 也会在展示完成态前关闭。
       if (
         !hasTrackedOperation(OperationKind.REFRESH) &&
         refreshLayout.state != RefreshState.RefreshFinish &&
         wasRefreshActive &&
         !wasLoadMoreActive
       ) {
-        // finishRefresh only handles the fully-open Refreshing state. React
-        // can clear the prop while the opening/rebound animator is still in
-        // PullDownToRefresh; closeHeaderOrFooter covers those visual-only
-        // states and guarantees the Translate header returns above content.
+        // finishRefresh 只处理完全展开的 Refreshing 状态。React 也可能在展开/回弹动画仍处于
+        // PullDownToRefresh 时清空属性；closeHeaderOrFooter 能覆盖这些纯视觉状态，确保 Header 收回内容上方。
         refreshLayout.closeHeaderOrFooter()
       }
     }
@@ -216,8 +233,7 @@ internal class ExpoSmartRefreshLayoutView(
         refreshLayout.autoLoadMoreAnimationOnly()
       }
     } else {
-      // Keep the load-more request for its finishLoadMore command for the
-      // same Fabric prop/command ordering reason as refreshing above.
+      // 与 refreshing 相同，Fabric 的属性提交和命令到达顺序不固定，加载请求也要保留到 finish 命令处理完。
       if (
         !hasTrackedOperation(OperationKind.LOAD_MORE) &&
         refreshLayout.state != RefreshState.LoadFinish &&
@@ -381,9 +397,11 @@ internal class ExpoSmartRefreshLayoutView(
     delayedCallbacks.clear()
     activeOperation = null
     scheduledOperation = null
+    onHeaderMoving = null
   }
 
   private fun scheduleOperation(operation: Operation, delayMs: Int) {
+    // activeOperation 与 scheduledOperation 共同构成实例级互斥锁，防止刷新和加载更多交叉执行。
     if (operation.requestId <= 0 || activeOperation != null || scheduledOperation != null) return
     scheduledOperation = operation
     postDelayedTracked(delayMs) {
@@ -397,6 +415,7 @@ internal class ExpoSmartRefreshLayoutView(
     delayMs: Int,
     completion: () -> Unit
   ) {
+    // requestId 将结束命令绑定到发起它的那次请求；0 仅用于没有 JS 请求记录的纯视觉同步。
     val scheduled = scheduledOperation
     val active = activeOperation
     val matchesScheduled = scheduled?.kind == kind && scheduled.requestId == requestId
@@ -405,6 +424,8 @@ internal class ExpoSmartRefreshLayoutView(
     if (!matchesScheduled && !matchesActive && !visualOnly) return
 
     postDelayedTracked(delayMs) {
+      // 延迟期间可能已经开始新请求，所以执行前必须再次比对 requestId。
+      // 旧回调直接失效，不能把后来一次请求的动画和锁一并结束。
       val current = activeOperation
       val currentScheduled = scheduledOperation
       val stillScheduled =
@@ -443,6 +464,7 @@ internal class ExpoSmartRefreshLayoutView(
     scheduledOperation?.kind == kind || activeOperation?.kind == kind
 
   private fun beginGestureOperation(kind: OperationKind) {
+    // 手势请求与命令请求共用同一把锁，避免用户连续拖拽绕过 JS 层的请求保护。
     if (activeOperation != null || scheduledOperation != null) {
       closeRejectedGesture()
       return
@@ -470,12 +492,14 @@ internal class ExpoSmartRefreshLayoutView(
   }
 
   private fun allocateGestureRequestId(): Int {
+    // 手势使用负数，程序化命令使用正数，两类请求无需共享 JS 侧的递增序列也不会碰撞。
     val current = nextGestureRequestId
     nextGestureRequestId = if (current == Int.MIN_VALUE) -1 else current - 1
     return current
   }
 
   private fun postDelayedTracked(delayMs: Int, action: () -> Unit) {
+    // 集中登记延迟任务，视图从 Fabric 树卸载后可一次取消，避免回调继续访问已销毁实例。
     lateinit var runnable: Runnable
     runnable = Runnable {
       delayedCallbacks.remove(runnable)
@@ -503,6 +527,7 @@ internal class ExpoSmartRefreshLayoutView(
   }
 
   private fun applyAutoLoadMoreState() {
+    // “已启用”与“本次手势已解锁”必须同时满足；完成请求或反向拖动后会重新上锁。
     refreshLayout.setEnableLoadMoreWhenContentNotFull(!autoLoadMoreEnabled)
     refreshLayout.setEnableAutoLoadMore(
       autoLoadMoreEnabled && autoLoadMoreArmed && loadMoreEnabled && !noMoreData
@@ -518,10 +543,13 @@ internal class ExpoSmartRefreshLayoutView(
   private fun rebuildHeader() {
     if (headerMatchesRequestedConfiguration()) return
 
-    // A Classic spinner-style change intentionally keeps this component
-    // instance. ClassicsAbstract caches its content baseline during the first
-    // normal measure, which Scale needs when its idle height is zero.
-    val nextHeader: RefreshHeader = if (headerStyle == "material") {
+    // 仅切换 Classic spinnerStyle 时会有意复用 Header 实例。ClassicsAbstract 会在首次正常测量时缓存
+    // 内容基线，而 Scale 的空闲高度为零，重建实例会丢失这条基线。
+    val nextHeader: RefreshHeader = if (headerSlot != null) {
+      val slot = requireNotNull(headerSlot)
+      if (slot.parent is ViewGroup) (slot.parent as ViewGroup).removeView(slot)
+      SlotRefreshHeader(context, slot)
+    } else if (headerStyle == "material") {
       MaterialHeader(context)
     } else {
       ConfiguredClassicsHeader(context).apply {
@@ -531,13 +559,18 @@ internal class ExpoSmartRefreshLayoutView(
 
     header = nextHeader
     installedHeaderStyle = headerStyle
-    refreshLayout.setRefreshHeader(nextHeader)
+    if (nextHeader is SlotRefreshHeader) {
+      refreshLayout.setRefreshHeader(nextHeader, 0, customHeaderHeightPx())
+    } else {
+      refreshLayout.setRefreshHeader(nextHeader)
+    }
     applyHeaderConfiguration()
     applyMessages()
     applyColors()
   }
 
   private fun requestHeaderRebuild() {
+    // Header 在拖拽或刷新过程中被替换会破坏库内 spinner 状态，因此配置先标记为待处理，空闲后再应用。
     if (disposed) return
     headerRebuildPending = true
     if (!canReconfigureHeaderNow()) return
@@ -561,6 +594,7 @@ internal class ExpoSmartRefreshLayoutView(
   }
 
   private fun rebuildFooter() {
+    // Footer 重建后需要恢复 no-more-data 或 loading 的原生视觉，否则 React 属性虽然正确，界面会回到空闲态。
     footer = ConfiguredClassicsFooter(context)
     refreshLayout.setRefreshFooter(requireNotNull(footer))
     applyMessages()
@@ -602,6 +636,9 @@ internal class ExpoSmartRefreshLayoutView(
         refreshLayout.setEnableHeaderTranslationContent(
           materialEnableHeaderTranslationContent
         )
+      }
+      is SlotRefreshHeader -> {
+        refreshLayout.setEnableHeaderTranslationContent(true)
       }
     }
     header?.view?.invalidate()
@@ -658,10 +695,8 @@ internal class ExpoSmartRefreshLayoutView(
     if (width == 0) return
     val headerWidth = (width - leftMargin - rightMargin).coerceAtLeast(0)
 
-    // SmartRefreshLayout's Scale branch deliberately keeps an idle header at
-    // zero height, then remeasures it at the spinner height while dragging.
-    // Preserve its previously initialized full width so that branch never
-    // starts from a 0xN replacement view under Fabric.
+    // SmartRefreshLayout 的 Scale 分支会让空闲 Header 保持零高度，拖拽时再按 spinner 高度测量。
+    // 这里保留初始化后的完整宽度，避免 Fabric 下替换出来的 View 从 0xN 尺寸开始布局。
     val headerHeight = if (spinnerStyle.scale) {
       mSpinner.coerceAtLeast(0)
     } else {
@@ -683,10 +718,8 @@ internal class ExpoSmartRefreshLayoutView(
       leftMargin + headerView.measuredWidth,
       top + headerView.measuredHeight
     )
-    // moveSpinner only updates a Translate header when its spinner value
-    // changes. RefreshFinish publishes its state before that next movement,
-    // so resetting this to zero here would hide the completion label above
-    // the content for the whole finish delay.
+    // moveSpinner 仅在 spinner 数值变化时更新 Translate Header。RefreshFinish 会先于下一次位移发布，
+    // 若此处把 translationY 清零，完成文案会在整个延迟期间被藏到内容上方。
     headerView.translationY = if (spinnerStyle == SpinnerStyle.Translate) {
       mSpinner.toFloat()
     } else {
@@ -701,9 +734,22 @@ internal class ExpoSmartRefreshLayoutView(
     footer?.takeIf { it.spinnerStyle.front }?.let { layout.bringChildToFront(it.view) }
   }
 
-  private fun headerMatchesRequestedConfiguration(): Boolean =
-    header != null &&
-      installedHeaderStyle == headerStyle
+  private fun headerMatchesRequestedConfiguration(): Boolean {
+    val currentHeader = header ?: return false
+    return if (headerSlot != null) {
+      currentHeader is SlotRefreshHeader && currentHeader.slotHost === headerSlot
+    } else {
+      installedHeaderStyle == headerStyle && currentHeader !is SlotRefreshHeader
+    }
+  }
+
+  private fun customHeaderHeightPx(): Int =
+    (CUSTOM_HEADER_HEIGHT_DP * resources.displayMetrics.density).toInt().coerceAtLeast(1)
+
+  // SmartRefreshLayout reports physical pixels, while React Native layout and
+  // the iOS implementation expose logical pixels through onHeaderMoving.
+  private fun pxToDp(value: Int): Int =
+    (value / resources.displayMetrics.density).roundToInt()
 
   private fun canReconfigureHeaderNow(): Boolean =
     refreshLayout.state == RefreshState.None &&
@@ -726,10 +772,8 @@ internal class ExpoSmartRefreshLayoutView(
         oldState: RefreshState,
         newState: RefreshState
       ) {
-        // A Classics TextView changes its text after Fabric has already laid
-        // out this native root. Remeasure only the current header so longer
-        // state strings such as "正在刷新..." do not retain the pulling
-        // label's narrower child width.
+        // Classics TextView 改文字时，Fabric 已经完成这个原生根节点的布局。
+        // 只重测当前 Header，避免“正在刷新...”等较长状态文案沿用下拉提示的较窄子节点宽度。
         (header as? ConfiguredClassicsHeader)?.let { classic ->
           restoreClassicHeaderLayout(classic, classic.spinnerStyle)
         }
@@ -746,7 +790,15 @@ internal class ExpoSmartRefreshLayoutView(
       override fun onHeaderMoving(
         header: RefreshHeader?, isDragging: Boolean, percent: Float, offset: Int,
         headerHeight: Int, maxDragHeight: Int
-      ) = Unit
+      ) {
+        onHeaderMoving?.invoke(
+          percent,
+          pxToDp(offset),
+          pxToDp(headerHeight),
+          pxToDp(maxDragHeight),
+          isDragging
+        )
+      }
 
       override fun onFooterMoving(
         footer: RefreshFooter?, isDragging: Boolean, percent: Float, offset: Int,
@@ -771,6 +823,7 @@ internal class ExpoSmartRefreshLayoutView(
   }
 
   private companion object {
+    const val CUSTOM_HEADER_HEIGHT_DP = 80f
     const val MATERIAL_DEFAULT_PRIMARY_COLOR = 0xff11bbff.toInt()
     const val MATERIAL_DEFAULT_PROGRESS_BACKGROUND_COLOR = 0xfffafafa.toInt()
     val MATERIAL_DEFAULT_PROGRESS_COLORS = intArrayOf(

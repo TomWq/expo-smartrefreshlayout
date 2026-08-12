@@ -26,6 +26,7 @@ internal class ExpoSmartRefreshLayoutViewManager :
     ExpoSmartRefreshLayoutView(reactContext)
 
   override fun addView(parent: ExpoSmartRefreshLayoutView, child: View, index: Int) {
+    // Fabric 的通用 addView 不理解 SmartRefreshLayout 的 RefreshContent 登记流程，交给组件专用入口处理。
     parent.addReactChild(child, index)
   }
 
@@ -42,6 +43,7 @@ internal class ExpoSmartRefreshLayoutViewManager :
     reactContext: ThemedReactContext,
     view: ExpoSmartRefreshLayoutView
   ) {
+    // 使用当前 Surface 和 React Tag 获取 dispatcher，确保事件被派发到正确的 Fabric 树实例。
     fun emit(name: String, payload: com.facebook.react.bridge.WritableMap = Arguments.createMap()) {
       UIManagerHelper.getEventDispatcherForReactTag(reactContext, view.id)?.dispatchEvent(
         SmartRefreshEvent(UIManagerHelper.getSurfaceId(view), view.id, name, payload)
@@ -64,13 +66,24 @@ internal class ExpoSmartRefreshLayoutViewManager :
     view.onStateChange = { state ->
       emit("topStateChange", Arguments.createMap().apply { putString("state", state) })
     }
+    view.onHeaderMoving = { percent, offset, height, maxDragHeight, isDragging ->
+      emit("topHeaderMoving", Arguments.createMap().apply {
+        putDouble("percent", percent.toDouble())
+        putInt("offset", offset)
+        putInt("height", height)
+        putInt("maxDragHeight", maxDragHeight)
+        putBoolean("isDragging", isDragging)
+      })
+    }
   }
 
   override fun onDropViewInstance(view: ExpoSmartRefreshLayoutView) {
+    // 卸载时先取消延迟命令并断开闭包，避免回调继续持有 ReactContext 或复用后的 view id。
     view.dispose()
     view.onRefresh = null
     view.onLoadMore = null
     view.onStateChange = null
+    view.onHeaderMoving = null
     super.onDropViewInstance(view)
   }
 
@@ -110,6 +123,7 @@ internal class ExpoSmartRefreshLayoutViewManager :
   override fun setNoMoreDataText(view: ExpoSmartRefreshLayoutView, value: String?) = view.setNoMoreDataText(value)
   override fun beginRefresh(view: ExpoSmartRefreshLayoutView, requestId: Int, delayMs: Int) =
     view.beginRefresh(requestId, delayMs)
+  // Fabric Codegen 将组件命令路由到具体 View 实例；requestId 用于拒绝已过期的异步结束命令。
   override fun finishRefresh(
     view: ExpoSmartRefreshLayoutView,
     requestId: Int,
@@ -128,10 +142,12 @@ internal class ExpoSmartRefreshLayoutViewManager :
   override fun resetNoMoreData(view: ExpoSmartRefreshLayoutView) = view.resetNoMoreDataState()
 
   override fun getExportedCustomDirectEventTypeConstants(): MutableMap<String, Any> =
+    // 原生事件名必须与 Codegen 生成的 top* 名称、JS registrationName 同时对应。
     mutableMapOf(
       "topRefresh" to mutableMapOf("registrationName" to "onRefresh"),
       "topLoadMore" to mutableMapOf("registrationName" to "onLoadMore"),
-      "topStateChange" to mutableMapOf("registrationName" to "onStateChange")
+      "topStateChange" to mutableMapOf("registrationName" to "onStateChange"),
+      "topHeaderMoving" to mutableMapOf("registrationName" to "onHeaderMoving")
     )
 
   companion object {

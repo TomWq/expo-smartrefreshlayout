@@ -34,6 +34,8 @@ Expo 应用可以继续使用该库，但需要 development build 或本地原�
 | `headerType="classics"` | `headerStyle="classic"` |
 | `headerType="material"` | `headerStyle="material"` |
 | `onStateChanged` | `onStateChange` |
+| `renderHeader` | `refreshHeader` |
+| `onHeaderMoving` | `onHeaderMoving`（字段改为 `percent`、`offset`、`height`、`maxDragHeight`、`isDragging`） |
 | Classic Header/Footer 文字对象 | `messages` |
 | Header/Footer 强调色 | `indicatorColor`、`titleColor` |
 | Classic `setSpinnerStyle` | `classicSpinnerStyle` |
@@ -85,8 +87,8 @@ const refreshRef = useRef<SmartRefreshLayoutRef>(null);
 
 为了让 Android 和 iOS 行为一致，v2 首版只保留可跨平台验证的核心能力。以下 v1 API 暂未迁移：
 
-- `renderHeader`、`renderFooter` 和 `DefaultRefreshHeader`
-- `onHeaderMoving`、`onFooterMoving`
+- `renderFooter` 和 `DefaultRefreshHeader`
+- `onFooterMoving`
 - Header/Footer 高度、拖拽倍率、回弹时间等 Android 细粒度参数
 - 旧 `classicRefreshHeaderProps`、`classicLoadMoreFooterProps` 对象形式；Classic/Material
   官方样式配置请改用 `classicSpinnerStyle`、`classicEnableLastTime`、

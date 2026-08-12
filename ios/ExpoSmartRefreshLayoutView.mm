@@ -1,4 +1,6 @@
 #import "ExpoSmartRefreshLayoutView.h"
+#import "ExpoSmartRefreshHeaderSlotView.h"
+#import "RNSmartCustomHeader.h"
 
 #import "SmartRefreshControl/RNSmartRefreshAdapter.h"
 #import <React/RCTComponentViewFactory.h>
@@ -12,6 +14,7 @@
 #import "RCTFabricComponentsPlugins.h"
 
 #include <limits.h>
+#include <cmath>
 
 using namespace facebook::react;
 
@@ -22,6 +25,8 @@ static NSString *RNSStringFromStdString(const std::string &value)
 
 static void RNSFindBestScrollView(UIView *view, UIScrollView **best, CGFloat *bestArea)
 {
+  // FlatList/ScrollView 在 Fabric 下可能包含包装视图。选择可视面积最大的
+  // UIScrollView，避免误绑定内部尺寸较小的辅助滚动容器。
   if ([view isKindOfClass:[UIScrollView class]]) {
     UIScrollView *candidate = (UIScrollView *)view;
     CGFloat area = CGRectGetWidth(candidate.bounds) * CGRectGetHeight(candidate.bounds);
@@ -54,6 +59,9 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
 - (void)emitRefresh:(NSInteger)requestId source:(NSString *)source;
 - (void)emitLoadMore:(NSInteger)requestId source:(NSString *)source;
 - (void)emitState:(NSString *)state;
+- (void)emitHeaderMovingWithOffset:(CGFloat)offset
+                           percent:(CGFloat)percent
+                        isDragging:(BOOL)isDragging;
 - (NSInteger)allocateGestureRequestId;
 - (void)beginRefreshVisualOnly;
 - (void)beginLoadMoreVisualOnly;
@@ -71,9 +79,12 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
 @end
 
 @implementation ExpoSmartRefreshLayoutView {
+  // Fabric 子树中的真实滚动容器，以及附着在它上面的原生刷新组件。
   UIScrollView *_scrollView;
   UIRefreshHeader *_header;
   UIRefreshFooter *_footer;
+  ExpoSmartRefreshHeaderSlotView *_headerSlot;
+  UIView<RCTComponentViewProtocol> *_contentComponentView;
 
   BOOL _refreshEnabled;
   BOOL _loadMoreEnabled;
@@ -92,12 +103,17 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
   BOOL _refreshEventEmitted;
   BOOL _loadMoreEventEmitted;
 
+  // active 表示已开始的请求，scheduled 表示仍在等待 delayMs 的命令。
+  // 两者共用一把操作锁，保证刷新和加载更多不能并发或重复触发。
   RNSOperationKind _activeOperationKind;
   NSInteger _activeRequestId;
   RNSOperationKind _scheduledOperationKind;
   NSInteger _scheduledRequestId;
+  // 手势请求使用负数 ID，与 JS 发起命令时使用的正数 ID 分开，便于追踪来源。
   NSInteger _nextGestureRequestId;
 
+  // dispatch_after 无法直接取消。每次调度/作废时递增 generation，延迟回调
+  // 只有在代次仍一致时才可执行，防止旧命令影响后续请求或已回收的视图。
   NSUInteger _refreshBeginGeneration;
   NSUInteger _loadMoreBeginGeneration;
   NSUInteger _refreshFinishGeneration;
@@ -124,9 +140,8 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
 
 + (void)load
 {
-  // Expo's generated third-party provider uses NSClassFromString. Registering
-  // eagerly also covers static-library/linker configurations where that
-  // lookup happens before the component class is materialized.
+  // Expo 生成的第三方 provider 通过 NSClassFromString 查找组件。这里提前注册，
+  // 也兼容静态库/链接器在组件类尚未实例化前就执行查找的情况。
   [RCTComponentViewFactory.currentComponentViewFactory registerComponentViewClass:self];
 }
 
@@ -152,9 +167,23 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
 - (void)mountChildComponentView:(UIView<RCTComponentViewProtocol> *)childComponentView
                           index:(NSInteger)index
 {
-  NSAssert(index == 0, @"SmartRefreshLayout accepts exactly one child.");
-  [super mountChildComponentView:childComponentView index:index];
+  if ([childComponentView isKindOfClass:[ExpoSmartRefreshHeaderSlotView class]]) {
+    NSAssert(_headerSlot == nil, @"SmartRefreshLayout accepts one custom refresh header.");
+    NSAssert(childComponentView.superview == nil, @"Custom refresh header is already mounted.");
+    _headerSlot = (ExpoSmartRefreshHeaderSlotView *)childComponentView;
+    if (_scrollView != nil && _refreshEnabled) {
+      [self configureHeader];
+    }
+    return;
+  }
 
+  NSAssert(_contentComponentView == nil, @"SmartRefreshLayout accepts exactly one scroll-content child.");
+  NSAssert(childComponentView.superview == nil, @"SmartRefreshLayout content is already mounted.");
+  _contentComponentView = childComponentView;
+  [self insertSubview:childComponentView atIndex:0];
+
+  // Fabric 完成 mount 回调时，子树里的 ScrollView 可能还未完成 UIKit 层级挂载。
+  // 延迟到下一轮主队列再搜索，layoutSubviews 中还会提供一次兜底绑定。
   __weak ExpoSmartRefreshLayoutView *weakSelf = self;
   dispatch_async(dispatch_get_main_queue(), ^{
     ExpoSmartRefreshLayoutView *strongSelf = weakSelf;
@@ -168,19 +197,37 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
 - (void)unmountChildComponentView:(UIView<RCTComponentViewProtocol> *)childComponentView
                              index:(NSInteger)index
 {
+  if (childComponentView == _headerSlot) {
+    if (_header != nil && [_header isKindOfClass:[RNSmartCustomHeader class]]) {
+      [_header removeFromSuperview];
+      _header = nil;
+    }
+    [childComponentView removeFromSuperview];
+    _headerSlot = nil;
+    if (_scrollView != nil && _refreshEnabled) {
+      [self configureHeader];
+    }
+    return;
+  }
   if (_scrollView != nil &&
       (_scrollView == (UIScrollView *)childComponentView ||
        [_scrollView isDescendantOfView:childComponentView])) {
     [self detachFromScrollView];
   }
-  [super unmountChildComponentView:childComponentView index:index];
+  if (childComponentView == _contentComponentView) {
+    _contentComponentView = nil;
+  }
+  [childComponentView removeFromSuperview];
 }
 
 - (void)layoutSubviews
 {
   [super layoutSubviews];
   if (_scrollView == nil) {
-    [self attachToScrollView:RNSFindScrollView(self)];
+    [self attachToScrollView:RNSFindScrollView(_contentComponentView ?: self)];
+  }
+  if ([_header isKindOfClass:[RNSmartCustomHeader class]] && _headerSlot != nil) {
+    [(RNSmartCustomHeader *)_header updateContentHeight:CGRectGetHeight(_headerSlot.bounds)];
   }
 }
 
@@ -194,6 +241,8 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
   BOOL oldRefreshEnabled = oldViewProps.refreshEnabled;
   BOOL oldLoadMoreEnabled = oldViewProps.loadMoreEnabled;
 
+  // SmartRefreshControl 的样式和文案在组件实例上配置。相关 prop 改变时重建，
+  // 避免旧 Header/Footer 留下内部布局或状态缓存。
   BOOL rebuildHeader =
       oldViewProps.headerStyle != newViewProps.headerStyle ||
       oldViewProps.indicatorColor != newViewProps.indicatorColor ||
@@ -287,6 +336,8 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
       [self configureFooter];
     }
 
+    // refreshing/loadingMore 是受控视觉状态。这里只同步动画，不创建 requestId，
+    // 也不向 JS 重复发请求事件；真正的请求生命周期仍由手势或实例命令建立。
     if ((!oldRefreshing || rebuildHeader) && newViewProps.refreshing && _header != nil) {
       [self beginRefreshVisualOnly];
     } else if (oldRefreshing && !newViewProps.refreshing &&
@@ -350,8 +401,8 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
     [self configureFooter];
   }
 
-  // Fabric can mount children after the initial props update. Reapply
-  // controlled visuals without emitting duplicate request events.
+  // Fabric 可能在首次 props 更新之后才挂载子节点。绑定成功后重新应用受控视觉，
+  // begin*VisualOnly 会屏蔽原生组件的回调，因此不会重复发出请求事件。
   if (_refreshing) {
     [self beginRefreshVisualOnly];
   }
@@ -365,6 +416,8 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
 
 - (void)detachFromScrollView
 {
+  // 拆卸时先让所有延迟命令失效。移除组件过程中原生库可能产生状态回调，
+  // suppress 标记确保这些内部清理动作不会被当成新的业务请求。
   [self invalidateDelayedOperations];
   _suppressNextRefreshRequest = YES;
   _suppressNextLoadMoreRequest = YES;
@@ -386,11 +439,15 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
   _header = nil;
 
   __weak ExpoSmartRefreshLayoutView *weakSelf = self;
-  UIRefreshHeader *header = _materialHeader
-      ? (UIRefreshHeader *)[RNSmartMaterialHeader new]
-      : (UIRefreshHeader *)[RNSmartClassicsHeader new];
+  UIRefreshHeader *header = _headerSlot != nil
+      ? [[RNSmartCustomHeader alloc] initWithContentView:_headerSlot]
+      : (_materialHeader
+          ? (UIRefreshHeader *)[RNSmartMaterialHeader new]
+          : (UIRefreshHeader *)[RNSmartClassicsHeader new]);
   header.colorAccent = _indicatorColor;
-  if (_materialHeader) {
+  if (_headerSlot != nil) {
+    header.colorPrimary = UIColor.clearColor;
+  } else if (_materialHeader) {
     header.colorPrimary = _materialProgressBackgroundColor;
   } else {
     header.colorPrimary = _primaryColor;
@@ -407,13 +464,28 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
     classic.labelLastTime.textColor = _titleColor;
   }
 
+  // 适配器只报告原生生命周期；requestId、互斥锁和事件去重由桥接视图统一管理。
   header.refreshBlock = ^(UIRefreshHeader *component) {
     ExpoSmartRefreshLayoutView *strongSelf = weakSelf;
     if (strongSelf != nil) {
       [strongSelf refreshComponentDidRequest:component];
     }
   };
-  if (_materialHeader) {
+  if (_headerSlot != nil) {
+    RNSmartCustomHeader *customHeader = (RNSmartCustomHeader *)header;
+    customHeader.statusChanged = ^(UIRefreshStatus oldStatus, UIRefreshStatus status) {
+      ExpoSmartRefreshLayoutView *strongSelf = weakSelf;
+      if (strongSelf != nil) {
+        [strongSelf headerStateChanged:oldStatus status:status];
+      }
+    };
+    customHeader.scrollChanged = ^(CGFloat offset, CGFloat percent, BOOL isDragging) {
+      ExpoSmartRefreshLayoutView *strongSelf = weakSelf;
+      if (strongSelf != nil) {
+        [strongSelf emitHeaderMovingWithOffset:offset percent:percent isDragging:isDragging];
+      }
+    };
+  } else if (_materialHeader) {
     RNSmartMaterialHeader *material = (RNSmartMaterialHeader *)header;
     material.statusChanged = ^(UIRefreshStatus oldStatus, UIRefreshStatus status) {
       ExpoSmartRefreshLayoutView *strongSelf = weakSelf;
@@ -422,9 +494,10 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
       }
     };
     material.scrollChanged = ^(CGFloat offset, CGFloat percent, BOOL isDragging) {
-      (void)offset;
-      (void)percent;
-      (void)isDragging;
+      ExpoSmartRefreshLayoutView *strongSelf = weakSelf;
+      if (strongSelf != nil) {
+        [strongSelf emitHeaderMovingWithOffset:offset percent:percent isDragging:isDragging];
+      }
     };
   } else {
     RNSmartClassicsHeader *classic = (RNSmartClassicsHeader *)header;
@@ -435,9 +508,10 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
       }
     };
     classic.scrollChanged = ^(CGFloat offset, CGFloat percent, BOOL isDragging) {
-      (void)offset;
-      (void)percent;
-      (void)isDragging;
+      ExpoSmartRefreshLayoutView *strongSelf = weakSelf;
+      if (strongSelf != nil) {
+        [strongSelf emitHeaderMovingWithOffset:offset percent:percent isDragging:isDragging];
+      }
     };
   }
 
@@ -454,6 +528,8 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
   _footer = nil;
 
   __weak ExpoSmartRefreshLayoutView *weakSelf = self;
+  // iOS 加载更多统一使用 Classic Footer。auto 模式仍需真实向上拖动后才会解锁，
+  // 防止首次布局、内容尺寸变化或程序化滚动无意触发请求。
   RNSmartClassicsFooter *footer = [RNSmartClassicsFooter new];
   footer.isAutoLoadMore = _autoLoadMoreEnabled;
   footer.colorAccent = _indicatorColor;
@@ -492,11 +568,15 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
 
 - (void)refreshComponentDidRequest:(UIRefreshHeader *)header
 {
+  // 受控视觉同步和组件拆装也会调用原生 beginRefresh；这类回调只用于展示，
+  // 必须在进入请求状态机之前消费掉。
   if (_suppressNextRefreshRequest) {
     _suppressNextRefreshRequest = NO;
     return;
   }
 
+  // 程序化 begin 命令先登记 active/requestId，再由原生回调发事件。
+  // eventEmitted 防止同一个请求被底层组件重复通知。
   if (_activeOperationKind == RNSOperationKindRefresh) {
     if (_refreshEventEmitted) {
       return;
@@ -508,6 +588,7 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
     return;
   }
 
+  // 一把全局操作锁同时保护刷新和加载更多，避免两个方向竞争 contentInset。
   if (_activeOperationKind != RNSOperationKindNone ||
       _scheduledOperationKind != RNSOperationKindNone) {
     [header finishRefreshWithSuccess:NO];
@@ -536,6 +617,7 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
     return;
   }
 
+  // 与刷新相同：程序化命令沿用已登记的正 requestId，手势请求稍后分配负 ID。
   if (_activeOperationKind == RNSOperationKindLoadMore) {
     if (_loadMoreEventEmitted) {
       return;
@@ -566,6 +648,8 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
 - (void)headerStateChanged:(UIRefreshStatus)oldStatus status:(UIRefreshStatus)status
 {
   (void)oldStatus;
+  // 将第三方控件的细粒度状态收敛为 JS 公共 API 的 pulling/ready/
+  // refreshing/idle；触觉反馈只在一次拖拽首次越过释放阈值时触发。
   switch (status) {
     case UIRefreshStatusPullToRefresh:
       _didTriggerHeaderHaptic = NO;
@@ -600,6 +684,8 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
 - (void)footerStateChanged:(UISmartFooterStatus)oldStatus status:(UISmartFooterStatus)status
 {
   (void)oldStatus;
+  // Footer 状态同样映射为跨平台公共状态；NoMoreData 单独保留，便于 JS
+  // 区分正常结束与数据已经全部加载完毕。
   switch (status) {
     case UISmartFooterStatusReleaseToLoadMore:
     case UISmartFooterStatusReleasing:
@@ -626,6 +712,8 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
 
 #pragma mark - Events
 
+// Fabric EventEmitter 可能在视图挂载/回收的边界暂时为空，所有事件都需判空。
+// 请求事件携带 requestId 和 source，使 JS 能拒绝迟到结果并区分手势/命令来源。
 - (void)emitRefresh:(NSInteger)requestId source:(NSString *)source
 {
   auto emitter = std::static_pointer_cast<const ExpoSmartRefreshLayoutViewEventEmitter>(_eventEmitter);
@@ -650,10 +738,29 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
   }
 }
 
+- (void)emitHeaderMovingWithOffset:(CGFloat)offset
+                           percent:(CGFloat)percent
+                        isDragging:(BOOL)isDragging
+{
+  auto emitter = std::static_pointer_cast<const ExpoSmartRefreshLayoutViewEventEmitter>(_eventEmitter);
+  if (emitter != nullptr) {
+    CGFloat height = MAX(_header.expandHeight, 1);
+    emitter->onHeaderMoving({
+      (Float)percent,
+      (int)std::lround(offset),
+      (int)std::lround(height),
+      (int)std::lround(height * 2),
+      (bool)isDragging,
+    });
+  }
+}
+
 #pragma mark - Commands
 
 - (void)beginRefresh:(NSInteger)requestId delayMs:(NSInteger)delayMs
 {
+  // JS 命令必须使用正 ID；已有 active/scheduled 操作时直接拒绝，保证一个实例
+  // 任意时刻只有一个请求拥有结束动画的权限。
   if (requestId <= 0 || !_refreshEnabled || _header == nil ||
       _activeOperationKind != RNSOperationKindNone ||
       _scheduledOperationKind != RNSOperationKindNone) {
@@ -662,6 +769,8 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
 
   _scheduledOperationKind = RNSOperationKindRefresh;
   _scheduledRequestId = requestId;
+  // generation 相当于可取消令牌。即使旧 dispatch_after 已进入队列，后续取消、
+  // 重建或回收也会改变代次，使旧回调无法启动刷新。
   NSUInteger generation = ++_refreshBeginGeneration;
   __weak ExpoSmartRefreshLayoutView *weakSelf = self;
   dispatch_after(
@@ -692,11 +801,14 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
       _activeOperationKind == RNSOperationKindRefresh && _activeRequestId == requestId;
   BOOL matchesScheduled =
       _scheduledOperationKind == RNSOperationKindRefresh && _scheduledRequestId == requestId;
+  // requestId=0 专供受控视觉收尾，不代表业务请求；非零 ID 必须精确命中当前
+  // active/scheduled 请求，旧 Promise 的完成结果不能结束一个更新的刷新。
   BOOL visualOnly = requestId == 0 && _activeOperationKind == RNSOperationKindNone;
   if (!matchesActive && !matchesScheduled && !visualOnly) {
     return;
   }
 
+  // finish 也可能带 delayMs，因此使用独立 generation，后发结束命令覆盖先发命令。
   NSUInteger generation = ++_refreshFinishGeneration;
   __weak ExpoSmartRefreshLayoutView *weakSelf = self;
   dispatch_after(
@@ -762,6 +874,7 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
     return;
   }
 
+  // 先占用 scheduled 锁，再等待 delayMs，避免延迟期间手势插入另一项操作。
   _scheduledOperationKind = RNSOperationKindLoadMore;
   _scheduledRequestId = requestId;
   NSUInteger generation = ++_loadMoreBeginGeneration;
@@ -803,6 +916,7 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
       _activeOperationKind == RNSOperationKindLoadMore && _activeRequestId == requestId;
   BOOL matchesScheduled =
       _scheduledOperationKind == RNSOperationKindLoadMore && _scheduledRequestId == requestId;
+  // 与刷新一致，结束命令必须匹配 requestId；0 仅用于受控 prop 的视觉同步。
   BOOL visualOnly = requestId == 0 && _activeOperationKind == RNSOperationKindNone;
   if (!matchesActive && !matchesScheduled && !visualOnly) {
     return;
@@ -840,6 +954,7 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
         }
         strongSelf->_loadMoreEventEmitted = NO;
         strongSelf->_suppressNextLoadMoreRequest = NO;
+        // 一次自动加载完成后重新上锁，必须等待下一次真实向上拖动再解锁。
         [strongSelf disarmAutoLoadMore];
         if (noMoreData) {
           [strongSelf->_footer finishLoadMoreWithNoMoreData];
@@ -865,6 +980,7 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
 
 - (NSInteger)allocateGestureRequestId
 {
+  // 负数空间专用于原生手势，INT_MIN 后回绕到 -1，始终不与 JS 正 ID 冲突。
   NSInteger requestId = _nextGestureRequestId;
   _nextGestureRequestId = requestId == INT_MIN ? -1 : requestId - 1;
   return requestId;
@@ -875,6 +991,7 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
   if (_header == nil || _header.isRefreshing) {
     return;
   }
+  // 原生 begin 会走 refreshBlock；提前设置 suppress，仅同步动画而不创建请求。
   _suppressNextRefreshRequest = YES;
   [_header beginRefresh];
 }
@@ -903,6 +1020,8 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
 
 - (void)cancelOperation:(RNSOperationKind)kind
 {
+  // 取消既清除锁和 requestId，也递增相应 generation，让已经排队的 begin/finish
+  // 回调在醒来后自行失效。
   if (_scheduledOperationKind == kind) {
     if (kind == RNSOperationKindRefresh) {
       _refreshBeginGeneration++;
@@ -934,6 +1053,7 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
 
 - (void)invalidateDelayedOperations
 {
+  // Fabric 回收或更换滚动子树时统一作废全部异步工作，防止复用后的组件收到旧命令。
   _refreshBeginGeneration++;
   _loadMoreBeginGeneration++;
   _refreshFinishGeneration++;

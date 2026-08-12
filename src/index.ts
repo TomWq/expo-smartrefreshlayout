@@ -5,6 +5,7 @@ export type {
   ClassicSpinnerStyle,
   FinishLoadMoreOptions,
   FinishRefreshOptions,
+  HeaderMovingEvent,
   LoadMoreMode,
   LoadMoreResult,
   RefreshMessages,

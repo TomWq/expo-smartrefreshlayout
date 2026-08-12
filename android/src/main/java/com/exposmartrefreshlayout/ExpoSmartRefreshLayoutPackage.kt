@@ -10,6 +10,7 @@ class ExpoSmartRefreshLayoutPackage : BaseReactPackage() {
   override fun createViewManagers(reactContext: ReactApplicationContext): List<ViewManager<*, *>> =
     listOf(
       ExpoSmartRefreshLayoutViewManager(),
+      ExpoSmartRefreshHeaderSlotViewManager(),
       ExpoSmartSecondFloorLayoutViewManager(),
       ExpoSmartSecondFloorContentSlotViewManager(),
       ExpoSmartSecondFloorFloorSlotViewManager(),

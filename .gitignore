@@ -56,6 +56,7 @@ npm-debug.log
 yarn-debug.log
 yarn-error.log
 package-lock.json
+!website/package-lock.json
 
 # Expo
 .expo/*
@@ -84,6 +85,3 @@ logs/
 *.tmp
 *.temp
 .cache/
-
-
-PUBLISHING.md
