@@ -1,6 +1,6 @@
 {
   "name": "expo-smartrefreshlayout",
-  "version": "2.0.0-alpha.0",
+  "version": "2.0.0-alpha.1",
   "description": "A React Native Fabric pull-to-refresh and load-more component backed by SmartRefreshLayout and SmartRefreshControl",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",
