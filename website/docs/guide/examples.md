@@ -203,8 +203,11 @@ export function LottieRefreshList() {
 }
 ```
 
-自定义 Header 是原生槽位中的固定 `80` 逻辑像素区域。`offset`、`height`、`maxDragHeight` 的单位是
-Android dp / iOS pt；`percent >= 1` 表示到达刷新阈值。
+自定义 Header 默认是原生槽位中的 `80` 逻辑像素区域，可用 `refreshHeaderHeight` 调整。`offset`、
+`height`、`maxDragHeight` 的单位是 Android dp / iOS pt；`percent >= 1` 表示到达刷新阈值。需要配置
+触发阈值、最大拖动距离、布局模式或完成态时，使用 `refreshHeaderTriggerRate`、
+`refreshHeaderMaxDragRate`、`refreshHeaderSpinnerStyle` 和 `refreshHeaderFinishDuration`；完整范围与
+生命周期 payload 请参阅 [样式与文案](./customization) 和 [API](../api/)。
 
 ## 错误处理
 

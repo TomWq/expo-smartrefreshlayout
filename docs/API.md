@@ -14,6 +14,11 @@ import { SmartRefreshLayout } from 'expo-smartrefreshlayout';
 | --- | --- | --- | --- |
 | `children` | `ReactElement` | 必填 | 唯一的滚动子组件 |
 | `refreshHeader` | `ReactElement` | - | 挂载到原生刷新 Header 内的自定义 React 内容 |
+| `refreshHeaderHeight` | `number` | `80` | 自定义 Header 高度，单位为逻辑 dp/pt；有限且必须大于 0 |
+| `refreshHeaderSpinnerStyle` | `'scale' \| 'translate' \| 'fixed-behind'` | `'translate'` | 仅作用于 `refreshHeader`，两端均支持 |
+| `refreshHeaderTriggerRate` | `number` | `1` | 自定义 Header 触发阈值倍数；有效范围 `(0, 1]` |
+| `refreshHeaderMaxDragRate` | `number` | `2` | 自定义 Header 最大拖动倍数；有效范围 `[1, 9]` |
+| `refreshHeaderFinishDuration` | `number` | `0` | 原生完成状态停留/完成动画时长，单位毫秒 |
 | `refreshEnabled` | `boolean` | 是否提供 `onRefresh` | 是否允许下拉刷新 |
 | `loadMoreEnabled` | `boolean` | 是否提供 `onLoadMore` | 是否允许上拉加载 |
 | `loadMoreMode` | `'pull' | 'auto'` | `'pull'` | `pull` 需要上拉释放；`auto` 需要先真实向上滚动且内容超过一屏 |
@@ -38,6 +43,10 @@ import { SmartRefreshLayout } from 'expo-smartrefreshlayout';
 | `onLoadMoreError` | `(error: unknown) => void` | - | `onLoadMore` 抛错后的通知 |
 | `onStateChange` | `(state: RefreshState) => void` | - | 原生刷新状态变化 |
 | `onHeaderMoving` | `(event: HeaderMovingEvent) => void` | - | Header 下拉距离变化；适合驱动自定义 Header 动画 |
+| `onHeaderInitialized` | `(event: HeaderLifecycleEvent) => void` | - | 原生 Header 完成尺寸初始化时触发 |
+| `onHeaderReleased` | `(event: HeaderLifecycleEvent) => void` | - | 用户释放且原生开始回弹/释放动画时触发 |
+| `onHeaderStart` | `(event: HeaderLifecycleEvent) => void` | - | 原生真正进入刷新动画时触发 |
+| `onHeaderFinish` | `({ success }: HeaderFinishEvent) => void` | - | 原生 Header 进入完成状态时触发，结果来自原生 `onFinish` |
 
 其余 `ViewProps` 会传给原生容器。
 
@@ -97,7 +106,9 @@ Android，iOS 会忽略但仍可安全传入。
 
 ### 自定义刷新 Header
 
-`refreshHeader` 会把 React 内容挂载到两端原生刷新 Header 中，而不是作为列表内容的普通兄弟节点。它的固定逻辑高度为 `80`，可通过内容自身的布局填充该区域。`onHeaderMoving` 的距离字段均为逻辑像素（dp/pt），`percent` 达到 `1` 时表示到达刷新阈值。
+`refreshHeader` 会把 React 内容挂载到两端原生刷新 Header 中，而不是作为列表内容的普通兄弟节点。默认高度为 `80`，可用 `refreshHeaderHeight` 覆盖；Android 使用 dp，iOS 使用 pt，事件统一以逻辑像素返回。`refreshHeaderSpinnerStyle` 的 `translate`、`scale`、`fixed-behind` 在两端分别映射到原生等价布局。`refreshHeaderTriggerRate` 的有效范围是 `(0, 1]`，`refreshHeaderMaxDragRate` 的有效范围是 `[1, 9]`；上限避开 Android 内核把 `>= 10` 解释为物理像素高度的特殊语义。`onHeaderMoving.maxDragHeight` 会反映该约束。
+
+`refreshHeaderFinishDuration` 是原生 Header 进入成功/失败完成态后停留的时长（毫秒，iOS 内部换算为秒），由 Header 的原生完成回调驱动 `onHeaderFinish`。它不同于 `finishRefresh({ delay })`：后者只延迟向原生发起完成命令。
 
 ```tsx
 const [headerProgress, setHeaderProgress] = useState(0);
@@ -148,6 +159,15 @@ interface HeaderMovingEvent {
   height: number;
   maxDragHeight: number;
   isDragging: boolean;
+}
+
+interface HeaderLifecycleEvent {
+  height: number;
+  maxDragHeight: number;
+}
+
+interface HeaderFinishEvent {
+  success: boolean;
 }
 ```
 

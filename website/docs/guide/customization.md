@@ -47,10 +47,10 @@ description: 配置 Classic、Material Header、颜色、Spinner 行为、状态
 
 ## 自定义 Lottie Header
 
-`refreshHeader` 会将内容挂载进原生 Header 槽位，并覆盖 Classic/Material Header。下例让 Lottie 在
-`pulling` 和 `ready` 阶段由 `progress` 跟随下拉距离；不要用 `isDragging` 过滤回调，否则松手取消时的
-回弹不会把动画带回 `0`。进入 `refreshing` 后移除受控 `progress`，改用 `play()` 和 `loop`；完成后在
-`idle` 阶段 `pause()`、`reset()`。
+`refreshHeader` 会将内容挂载进原生 Header 槽位，并覆盖 Classic/Material Header。默认高度为 `80` 逻辑
+像素，可用 `refreshHeaderHeight` 调整。下例让 Lottie 在 `pulling` 和 `ready` 阶段由 `progress` 跟随下拉
+距离；不要用 `isDragging` 过滤回调，否则松手取消时的回弹不会把动画带回 `0`。进入 `refreshing` 后移除
+受控 `progress`，改用 `play()` 和 `loop`；完成后在 `idle` 阶段 `pause()`、`reset()`。
 
 ```tsx
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -119,6 +119,11 @@ export function LottieRefreshList() {
     <SmartRefreshLayout
       style={{ flex: 1 }}
       loadMoreEnabled={false}
+      refreshHeaderHeight={80}
+      refreshHeaderSpinnerStyle="translate"
+      refreshHeaderTriggerRate={1}
+      refreshHeaderMaxDragRate={2}
+      refreshHeaderFinishDuration={250}
       refreshHeader={
         <View
           pointerEvents="none"
@@ -155,7 +160,16 @@ export function LottieRefreshList() {
 ```
 
 `onHeaderMoving` 的 `offset`、`height`、`maxDragHeight` 都是逻辑像素（Android dp / iOS pt），
-`percent >= 1` 表示达到刷新阈值。自定义 Header 当前固定高度为 `80` 逻辑像素。
+`percent >= 1` 表示达到刷新阈值。`refreshHeaderSpinnerStyle` 支持 `scale`、`translate`、
+`fixed-behind`；`refreshHeaderTriggerRate` 有效范围为 `(0, 1]`，`refreshHeaderMaxDragRate` 有效范围为
+`[1, 9]`。`9` 是跨端上限，避免 Android 内核将 `>= 10` 解释为物理像素高度。完成态需要停留或播放
+原生完成动画时，使用 `refreshHeaderFinishDuration`（`0..60000` 毫秒）；它不同于
+`finishRefresh({ delay })`，后者只延迟发起完成命令。
+
+仅自定义 Header 会提供生命周期事件：`onHeaderInitialized` 在原生尺寸初始化后触发，
+`onHeaderReleased` 在用户释放并开始回弹/释放动画时触发，`onHeaderStart` 在真正进入刷新动画时触发，
+三者的 payload 都是 `{ height, maxDragHeight }`。`onHeaderFinish` 在原生进入完成态时触发，payload 是
+`{ success }`；其结果来自原生完成回调，不是从 `onRefresh` Promise 推断。
 
 ## 自定义文案
 

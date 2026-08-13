@@ -42,6 +42,8 @@ internal class ExpoSmartRefreshLayoutView(
   private var header: RefreshHeader? = null
   private var footer: RefreshFooter? = null
   private var installedHeaderStyle: String? = null
+  private var installedCustomHeaderHeightPx: Int? = null
+  private var installedCustomHeaderSpinnerStyle: SpinnerStyle? = null
   private var headerRebuildPosted = false
   private var headerRebuildPending = false
   private var activeOperation: Operation? = null
@@ -63,6 +65,11 @@ internal class ExpoSmartRefreshLayoutView(
   private var indicatorColor: Int? = null
   private var titleColor: Int? = null
   private var classicSpinnerStyle = "translate"
+  private var refreshHeaderHeight = DEFAULT_CUSTOM_HEADER_HEIGHT_DP
+  private var refreshHeaderSpinnerStyle = "translate"
+  private var refreshHeaderTriggerRate = 1f
+  private var refreshHeaderMaxDragRate = 2f
+  private var refreshHeaderFinishDuration = 0
   private var classicEnableLastTime = true
   private var materialShowBezierWave = false
   private var materialEnableHeaderTranslationContent = false
@@ -80,6 +87,15 @@ internal class ExpoSmartRefreshLayoutView(
   var onLoadMore: ((Int, String) -> Unit)? = null
   var onStateChange: ((String) -> Unit)? = null
   var onHeaderMoving: ((Float, Int, Int, Int, Boolean) -> Unit)? = null
+  var onHeaderInitialized: ((Int, Int) -> Unit)? = null
+  var onHeaderReleased: ((Int, Int) -> Unit)? = null
+  var onHeaderStart: ((Int, Int) -> Unit)? = null
+  var onHeaderFinish: ((Boolean) -> Unit)? = null
+
+  private var headerInitializedEmitted = false
+  private var headerReleasedEmitted = false
+  private var headerStartEmitted = false
+  private var headerFinishEmitted = false
 
   init {
     refreshLayout.apply {
@@ -290,6 +306,49 @@ internal class ExpoSmartRefreshLayoutView(
     if (classicSpinnerStyle == nextValue) return
     classicSpinnerStyle = nextValue
     if (headerStyle == "classic") requestHeaderRebuild()
+  }
+
+  fun setRefreshHeaderHeight(value: Int) {
+    val nextValue = value.toFloat().takeIf { it > 0 } ?: DEFAULT_CUSTOM_HEADER_HEIGHT_DP
+    if (refreshHeaderHeight == nextValue) return
+    refreshHeaderHeight = nextValue
+    if (headerSlot != null) applyCustomHeaderGeometryIfIdle()
+  }
+
+  fun setRefreshHeaderSpinnerStyle(value: String?) {
+    val nextValue = when (value?.lowercase(Locale.ROOT)) {
+      "scale" -> "scale"
+      "fixed-behind" -> "fixed-behind"
+      else -> "translate"
+    }
+    if (refreshHeaderSpinnerStyle == nextValue) return
+    refreshHeaderSpinnerStyle = nextValue
+    if (headerSlot != null) applyCustomHeaderGeometryIfIdle()
+  }
+
+  fun setRefreshHeaderTriggerRate(value: Float) {
+    val nextValue = value.takeIf { it.isFinite() && it > 0f }?.coerceAtMost(1f) ?: 1f
+    if (refreshHeaderTriggerRate == nextValue) return
+    refreshHeaderTriggerRate = nextValue
+    if (headerSlot != null) {
+      refreshLayout.setHeaderTriggerRate(nextValue)
+    }
+  }
+
+  fun setRefreshHeaderMaxDragRate(value: Float) {
+    val nextValue = value.takeIf { it.isFinite() && it >= 1f }?.coerceAtMost(9f) ?: 2f
+    if (refreshHeaderMaxDragRate == nextValue) return
+    refreshHeaderMaxDragRate = nextValue
+    if (headerSlot != null) {
+      refreshLayout.setHeaderMaxDragRate(nextValue)
+    }
+  }
+
+  fun setRefreshHeaderFinishDuration(value: Int) {
+    val nextValue = value.coerceAtLeast(0)
+    if (refreshHeaderFinishDuration == nextValue) return
+    refreshHeaderFinishDuration = nextValue
+    (header as? SlotRefreshHeader)?.finishDurationMs = nextValue
   }
 
   fun setClassicEnableLastTime(value: Boolean) {
@@ -548,7 +607,16 @@ internal class ExpoSmartRefreshLayoutView(
     val nextHeader: RefreshHeader = if (headerSlot != null) {
       val slot = requireNotNull(headerSlot)
       if (slot.parent is ViewGroup) (slot.parent as ViewGroup).removeView(slot)
-      SlotRefreshHeader(context, slot)
+      SlotRefreshHeader(context, slot).apply {
+        setSpinnerStyle(resolveCustomSpinnerStyle())
+        finishDurationMs = refreshHeaderFinishDuration
+        initialized = { height, maxDragHeight ->
+          if (!headerInitializedEmitted) {
+            headerInitializedEmitted = true
+            onHeaderInitialized?.invoke(pxToDp(height), pxToDp(maxDragHeight))
+          }
+        }
+      }
     } else if (headerStyle == "material") {
       MaterialHeader(context)
     } else {
@@ -559,9 +627,25 @@ internal class ExpoSmartRefreshLayoutView(
 
     header = nextHeader
     installedHeaderStyle = headerStyle
+    installedCustomHeaderHeightPx = null
+    installedCustomHeaderSpinnerStyle = null
+    headerInitializedEmitted = false
+    headerReleasedEmitted = false
+    headerStartEmitted = false
+    headerFinishEmitted = false
     if (nextHeader is SlotRefreshHeader) {
+      // Configure rates before attaching the Header so its first onInitialized
+      // callback already carries the effective maxDragHeight.
+      refreshLayout.setHeaderTriggerRate(refreshHeaderTriggerRate)
+      refreshLayout.setHeaderMaxDragRate(refreshHeaderMaxDragRate)
       refreshLayout.setRefreshHeader(nextHeader, 0, customHeaderHeightPx())
+      installedCustomHeaderHeightPx = customHeaderHeightPx()
+      installedCustomHeaderSpinnerStyle = resolveCustomSpinnerStyle()
     } else {
+      // Header trigger/max-drag are layout-global in SmartRefreshLayout. Do not
+      // leak a former custom Header's geometry into Classic or Material.
+      refreshLayout.setHeaderTriggerRate(DEFAULT_CUSTOM_HEADER_TRIGGER_RATE)
+      refreshLayout.setHeaderMaxDragRate(DEFAULT_CUSTOM_HEADER_MAX_DRAG_RATE)
       refreshLayout.setRefreshHeader(nextHeader)
     }
     applyHeaderConfiguration()
@@ -576,11 +660,56 @@ internal class ExpoSmartRefreshLayoutView(
     if (!canReconfigureHeaderNow()) return
 
     headerRebuildPending = false
-    if (headerMatchesRequestedConfiguration()) {
+    if (headerSlot != null && header is SlotRefreshHeader) {
+      headerRebuildPending = false
+      applyCustomHeaderGeometryIfIdle()
+    } else if (headerMatchesRequestedConfiguration()) {
       applyClassicSpinnerStyle()
     } else {
       rebuildHeader()
     }
+  }
+
+  private fun applyCustomHeaderGeometryIfIdle() {
+    if (headerSlot == null || !canReconfigureHeaderNow()) {
+      headerRebuildPending = true
+      return
+    }
+    val custom = header as? SlotRefreshHeader ?: return
+    val heightPx = customHeaderHeightPx()
+    custom.setSpinnerStyle(resolveCustomSpinnerStyle())
+    refreshLayout.setHeaderTriggerRate(refreshHeaderTriggerRate)
+    refreshLayout.setHeaderMaxDragRate(refreshHeaderMaxDragRate)
+    refreshLayout.setHeaderHeightPx(heightPx)
+    custom.layoutParams = custom.layoutParams?.apply { height = heightPx }
+    custom.minimumHeight = heightPx
+    custom.requestLayout()
+    restoreCustomHeaderLayout(custom, resolveCustomSpinnerStyle())
+    restoreRefreshChildOrder()
+    installedCustomHeaderHeightPx = heightPx
+    installedCustomHeaderSpinnerStyle = resolveCustomSpinnerStyle()
+    headerRebuildPending = false
+  }
+
+  private fun restoreCustomHeaderLayout(
+    custom: SlotRefreshHeader,
+    spinnerStyle: SpinnerStyle
+  ) {
+    if (width == 0) {
+      post { restoreCustomHeaderLayout(custom, spinnerStyle) }
+      return
+    }
+    val headerView = custom.view
+    val height = if (spinnerStyle.scale) mSpinner.coerceAtLeast(0) else mHeaderHeight
+    headerView.measure(
+      View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+      View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY)
+    )
+    val top = mHeaderInsetStart - if (spinnerStyle == SpinnerStyle.Translate) mHeaderHeight else 0
+    headerView.layout(0, top, headerView.measuredWidth, top + headerView.measuredHeight)
+    headerView.translationY = if (spinnerStyle == SpinnerStyle.Translate) mSpinner.toFloat() else 0f
+    headerView.visibility = View.VISIBLE
+    headerView.invalidate()
   }
 
   private fun postHeaderRebuildIfIdle() {
@@ -639,6 +768,8 @@ internal class ExpoSmartRefreshLayoutView(
       }
       is SlotRefreshHeader -> {
         refreshLayout.setEnableHeaderTranslationContent(true)
+        currentHeader.setSpinnerStyle(resolveCustomSpinnerStyle())
+        currentHeader.finishDurationMs = refreshHeaderFinishDuration
       }
     }
     header?.view?.invalidate()
@@ -729,6 +860,9 @@ internal class ExpoSmartRefreshLayoutView(
 
   private fun restoreRefreshChildOrder() {
     val layout = refreshLayout.layout
+    // Behind headers stay below RefreshContent; front headers must be moved
+    // above it after their SpinnerStyle changes at runtime.
+    header?.takeIf { !it.spinnerStyle.front }?.let { layout.bringChildToFront(it.view) }
     reactChild?.let(layout::bringChildToFront)
     header?.takeIf { it.spinnerStyle.front }?.let { layout.bringChildToFront(it.view) }
     footer?.takeIf { it.spinnerStyle.front }?.let { layout.bringChildToFront(it.view) }
@@ -737,14 +871,17 @@ internal class ExpoSmartRefreshLayoutView(
   private fun headerMatchesRequestedConfiguration(): Boolean {
     val currentHeader = header ?: return false
     return if (headerSlot != null) {
-      currentHeader is SlotRefreshHeader && currentHeader.slotHost === headerSlot
+      currentHeader is SlotRefreshHeader &&
+        currentHeader.slotHost === headerSlot &&
+        installedCustomHeaderHeightPx == customHeaderHeightPx() &&
+        installedCustomHeaderSpinnerStyle == resolveCustomSpinnerStyle()
     } else {
       installedHeaderStyle == headerStyle && currentHeader !is SlotRefreshHeader
     }
   }
 
   private fun customHeaderHeightPx(): Int =
-    (CUSTOM_HEADER_HEIGHT_DP * resources.displayMetrics.density).toInt().coerceAtLeast(1)
+    (refreshHeaderHeight * resources.displayMetrics.density).roundToInt().coerceAtLeast(1)
 
   // SmartRefreshLayout reports physical pixels, while React Native layout and
   // the iOS implementation expose logical pixels through onHeaderMoving.
@@ -756,6 +893,12 @@ internal class ExpoSmartRefreshLayoutView(
       !refreshLayout.isRefreshing &&
       !refreshLayout.isLoading &&
       activeOperation == null
+
+  private fun resolveCustomSpinnerStyle(): SpinnerStyle = when (refreshHeaderSpinnerStyle) {
+    "scale" -> SpinnerStyle.Scale
+    "fixed-behind" -> SpinnerStyle.FixedBehind
+    else -> SpinnerStyle.Translate
+  }
 
   private fun installListeners() {
     refreshLayout.setOnMultiListener(object : OnMultiListener {
@@ -772,6 +915,11 @@ internal class ExpoSmartRefreshLayoutView(
         oldState: RefreshState,
         newState: RefreshState
       ) {
+        if (newState == RefreshState.PullDownToRefresh || newState == RefreshState.None) {
+          headerReleasedEmitted = false
+          headerStartEmitted = false
+          headerFinishEmitted = false
+        }
         // Classics TextView 改文字时，Fabric 已经完成这个原生根节点的布局。
         // 只重测当前 Header，避免“正在刷新...”等较长状态文案沿用下拉提示的较窄子节点宽度。
         (header as? ConfiguredClassicsHeader)?.let { classic ->
@@ -805,9 +953,25 @@ internal class ExpoSmartRefreshLayoutView(
         footerHeight: Int, maxDragHeight: Int
       ) = Unit
 
-      override fun onHeaderReleased(header: RefreshHeader?, headerHeight: Int, maxDragHeight: Int) = Unit
-      override fun onHeaderStartAnimator(header: RefreshHeader?, headerHeight: Int, maxDragHeight: Int) = Unit
-      override fun onHeaderFinish(header: RefreshHeader?, success: Boolean) = Unit
+      override fun onHeaderReleased(header: RefreshHeader?, headerHeight: Int, maxDragHeight: Int) {
+        if (header !is SlotRefreshHeader || headerReleasedEmitted) return
+        headerReleasedEmitted = true
+        headerStartEmitted = false
+        headerFinishEmitted = false
+        onHeaderReleased?.invoke(pxToDp(headerHeight), pxToDp(maxDragHeight))
+      }
+      override fun onHeaderStartAnimator(header: RefreshHeader?, headerHeight: Int, maxDragHeight: Int) {
+        if (header !is SlotRefreshHeader || headerStartEmitted) return
+        headerStartEmitted = true
+        headerFinishEmitted = false
+        onHeaderStart?.invoke(pxToDp(headerHeight), pxToDp(maxDragHeight))
+      }
+      override fun onHeaderFinish(header: RefreshHeader?, success: Boolean) {
+        if (header !is SlotRefreshHeader || headerFinishEmitted) return
+        headerFinishEmitted = true
+        headerReleasedEmitted = false
+        onHeaderFinish?.invoke(success)
+      }
       override fun onFooterReleased(footer: RefreshFooter?, footerHeight: Int, maxDragHeight: Int) = Unit
       override fun onFooterStartAnimator(footer: RefreshFooter?, footerHeight: Int, maxDragHeight: Int) = Unit
       override fun onFooterFinish(footer: RefreshFooter?, success: Boolean) = Unit
@@ -823,7 +987,9 @@ internal class ExpoSmartRefreshLayoutView(
   }
 
   private companion object {
-    const val CUSTOM_HEADER_HEIGHT_DP = 80f
+    const val DEFAULT_CUSTOM_HEADER_HEIGHT_DP = 80f
+    const val DEFAULT_CUSTOM_HEADER_TRIGGER_RATE = 1f
+    const val DEFAULT_CUSTOM_HEADER_MAX_DRAG_RATE = 2f
     const val MATERIAL_DEFAULT_PRIMARY_COLOR = 0xff11bbff.toInt()
     const val MATERIAL_DEFAULT_PROGRESS_BACKGROUND_COLOR = 0xfffafafa.toInt()
     val MATERIAL_DEFAULT_PROGRESS_COLORS = intArrayOf(

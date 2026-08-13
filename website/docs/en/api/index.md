@@ -19,6 +19,11 @@ The component requires exactly one `FlatList`, `SectionList`, `ScrollView`, or c
 | --- | --- | --- | --- |
 | `children` | `ReactElement` | required | The single scrolling child |
 | `refreshHeader` | `ReactElement` | - | React content mounted in the Android/iOS native refresh-header slot; replaces the Classic or Material header selected by `headerStyle` |
+| `refreshHeaderHeight` | `number` | `80` | Custom Header logical height (Android dp / iOS pt); finite positive values are capped at `10000` and rounded, while invalid or non-positive rounded values fall back to `80` |
+| `refreshHeaderSpinnerStyle` | `'scale' \| 'translate' \| 'fixed-behind'` | `'translate'` | Native motion mode for `refreshHeader` on both platforms |
+| `refreshHeaderTriggerRate` | `number` | `1` | Custom Header refresh-trigger height multiplier; valid range `(0, 1]`, otherwise falls back to `1` |
+| `refreshHeaderMaxDragRate` | `number` | `2` | Custom Header maximum-pull-height multiplier; valid range `[1, 9]`, otherwise falls back to `2` |
+| `refreshHeaderFinishDuration` | `number` | `0` | Custom Header native completion-state dwell/finish-animation duration in milliseconds, normalized to `0..60000` |
 | `refreshEnabled` | `boolean` | has `onRefresh` | Enables pull to refresh |
 | `loadMoreEnabled` | `boolean` | has `onLoadMore` | Enables load more |
 | `loadMoreMode` | `'pull' \| 'auto'` | `'pull'` | `pull` requires a pull-release; `auto` waits for overflowing content and a real upward scroll |
@@ -43,19 +48,32 @@ The component requires exactly one `FlatList`, `SectionList`, `ScrollView`, or c
 | `onLoadMoreError` | `(error: unknown) => void` | - | Pagination failure notification |
 | `onStateChange` | `(state: RefreshState) => void` | - | Native state change |
 | `onHeaderMoving` | `(event: HeaderMovingEvent) => void` | - | Custom-header pull-distance updates, including spring-back after release |
+| `onHeaderInitialized` | `(event: HeaderLifecycleEvent) => void` | - | Custom Header only: native dimensions initialized |
+| `onHeaderReleased` | `(event: HeaderLifecycleEvent) => void` | - | Custom Header only: user released and native release/spring-back begins |
+| `onHeaderStart` | `(event: HeaderLifecycleEvent) => void` | - | Custom Header only: native refresh animation actually begins |
+| `onHeaderFinish` | `(event: HeaderFinishEvent) => void` | - | Custom Header only: native completion state begins with success or failure |
 
 Other `ViewProps` pass through to the native container.
 
 ### Custom native header
 
 `refreshHeader` is mounted in a real Android/iOS native refresh-header slot, rather than as an ordinary child of the
-list. When supplied, it replaces the Classic or Material header chosen by `headerStyle`. A custom header currently
-has a fixed logical height of `80`; lay its content out inside that area. For display-only content, use
-`pointerEvents="none"` so it cannot intercept the list's pull gesture.
+list. When supplied, it replaces the Classic or Material header chosen by `headerStyle`. Its default logical height
+is `80` and `refreshHeaderHeight` can change it; keep the content layout aligned with that height. For display-only
+content, use `pointerEvents="none"` so it cannot intercept the list's pull gesture.
+
+`refreshHeaderSpinnerStyle` accepts `scale`, `translate`, or `fixed-behind`. `refreshHeaderTriggerRate` controls
+the refresh threshold relative to Header height, while `refreshHeaderMaxDragRate` controls the real maximum pull
+height. The maximum rate is capped at `9` so Android never treats `>= 10` as a physical-pixel height;
+`onHeaderMoving.maxDragHeight` reports the resulting limit. `refreshHeaderFinishDuration` controls the native
+success/failure completion dwell or finish animation. It is distinct from `finishRefresh({ delay })`, which delays
+sending the completion command.
 
 `onHeaderMoving` fires while dragging and while the header springs back after release. `offset`, `height`, and
 `maxDragHeight` are platform-independent logical pixels (Android dp / iOS pt); `percent >= 1` means the refresh
-threshold has been reached.
+threshold has been reached. For a custom Header, `onHeaderInitialized`, `onHeaderReleased`, and `onHeaderStart`
+receive `{ height, maxDragHeight }`. `onHeaderFinish` receives `{ success }` from the native completion callback,
+rather than a result inferred from the JavaScript Promise.
 
 ### Header colors and behavior
 
@@ -149,6 +167,18 @@ interface HeaderMovingEvent {
   maxDragHeight: number;
   /** Whether the user is actively dragging the scroll view. */
   isDragging: boolean;
+}
+
+interface HeaderLifecycleEvent {
+  /** Native Header height in logical pixels (dp/pt). */
+  height: number;
+  /** Maximum pull distance in logical pixels (dp/pt). */
+  maxDragHeight: number;
+}
+
+interface HeaderFinishEvent {
+  /** Result reported by the native Header completion state. */
+  success: boolean;
 }
 
 type RefreshState =

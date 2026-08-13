@@ -38,6 +38,15 @@ export type HeaderMovingEvent = Readonly<{
   isDragging: boolean;
 }>;
 
+export type HeaderLifecycleEvent = Readonly<{
+  height: CodegenTypes.Int32;
+  maxDragHeight: CodegenTypes.Int32;
+}>;
+
+export type HeaderFinishEvent = Readonly<{
+  success: boolean;
+}>;
+
 export interface NativeProps extends ViewProps {
   // Fabric WithDefault 会在原生侧补默认值，避免 JS 与 Android/iOS 默认配置分叉。
   refreshEnabled?: CodegenTypes.WithDefault<boolean, true>;
@@ -55,6 +64,14 @@ export interface NativeProps extends ViewProps {
     'scale' | 'translate' | 'fixed-behind',
     'translate'
   >;
+  refreshHeaderHeight?: CodegenTypes.WithDefault<CodegenTypes.Int32, 80>;
+  refreshHeaderSpinnerStyle?: CodegenTypes.WithDefault<
+    'scale' | 'translate' | 'fixed-behind',
+    'translate'
+  >;
+  refreshHeaderTriggerRate?: CodegenTypes.WithDefault<CodegenTypes.Float, 1>;
+  refreshHeaderMaxDragRate?: CodegenTypes.WithDefault<CodegenTypes.Float, 2>;
+  refreshHeaderFinishDuration?: CodegenTypes.WithDefault<CodegenTypes.Int32, 0>;
   classicEnableLastTime?: CodegenTypes.WithDefault<boolean, true>;
   materialShowBezierWave?: CodegenTypes.WithDefault<boolean, false>;
   materialEnableHeaderTranslationContent?: CodegenTypes.WithDefault<boolean, false>;
@@ -71,6 +88,10 @@ export interface NativeProps extends ViewProps {
   onLoadMore?: CodegenTypes.DirectEventHandler<RequestEvent>;
   onStateChange?: CodegenTypes.DirectEventHandler<StateChangeEvent>;
   onHeaderMoving?: CodegenTypes.DirectEventHandler<HeaderMovingEvent>;
+  onHeaderInitialized?: CodegenTypes.DirectEventHandler<HeaderLifecycleEvent>;
+  onHeaderReleased?: CodegenTypes.DirectEventHandler<HeaderLifecycleEvent>;
+  onHeaderStart?: CodegenTypes.DirectEventHandler<HeaderLifecycleEvent>;
+  onHeaderFinish?: CodegenTypes.DirectEventHandler<HeaderFinishEvent>;
 }
 
 type NativeComponent = HostComponent<NativeProps>;

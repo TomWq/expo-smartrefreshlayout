@@ -19,6 +19,11 @@ import { SmartRefreshLayout } from 'expo-smartrefreshlayout';
 | --- | --- | --- | --- |
 | `children` | `ReactElement` | 必填 | 唯一的滚动子组件 |
 | `refreshHeader` | `ReactElement` | - | 挂载到 Android/iOS 原生刷新 Header 槽位的 React 内容；提供后替代 `headerStyle` 选中的 Classic/Material Header |
+| `refreshHeaderHeight` | `number` | `80` | 自定义 Header 的逻辑高度（Android dp / iOS pt）；有限正数上限为 `10000`，会取整；非法或取整后非正的值回退 `80` |
+| `refreshHeaderSpinnerStyle` | `'scale' \| 'translate' \| 'fixed-behind'` | `'translate'` | 仅用于 `refreshHeader`；两端都映射到等价的原生布局模式 |
+| `refreshHeaderTriggerRate` | `number` | `1` | 自定义 Header 的刷新触发高度倍率；有效范围 `(0, 1]`，无效值回退 `1` |
+| `refreshHeaderMaxDragRate` | `number` | `2` | 自定义 Header 的最大下拉高度倍率；有效范围 `[1, 9]`，无效值回退 `2` |
+| `refreshHeaderFinishDuration` | `number` | `0` | 自定义 Header 成功/失败完成态的原生停留/完成动画时长（毫秒），归一化为 `0..60000` |
 | `refreshEnabled` | `boolean` | 是否提供 `onRefresh` | 是否允许下拉刷新 |
 | `loadMoreEnabled` | `boolean` | 是否提供 `onLoadMore` | 是否允许上拉加载 |
 | `loadMoreMode` | `'pull' | 'auto'` | `'pull'` | `pull` 需要上拉释放；`auto` 需要先真实向上滚动且内容超过一屏 |
@@ -43,18 +48,30 @@ import { SmartRefreshLayout } from 'expo-smartrefreshlayout';
 | `onLoadMoreError` | `(error: unknown) => void` | - | `onLoadMore` 抛错后的通知 |
 | `onStateChange` | `(state: RefreshState) => void` | - | 原生刷新状态变化 |
 | `onHeaderMoving` | `(event: HeaderMovingEvent) => void` | - | 自定义 Header 的下拉距离变化，包含松手后的回弹过程 |
+| `onHeaderInitialized` | `(event: HeaderLifecycleEvent) => void` | - | 仅自定义 Header：原生尺寸初始化完成 |
+| `onHeaderReleased` | `(event: HeaderLifecycleEvent) => void` | - | 仅自定义 Header：用户释放且原生开始释放/回弹动画 |
+| `onHeaderStart` | `(event: HeaderLifecycleEvent) => void` | - | 仅自定义 Header：原生真正开始刷新动画 |
+| `onHeaderFinish` | `(event: HeaderFinishEvent) => void` | - | 仅自定义 Header：原生进入成功或失败完成态 |
 
 其余 `ViewProps` 会传给原生容器。
 
 ### 自定义原生 Header
 
 `refreshHeader` 的内容会真实挂载到 Android 和 iOS 的原生刷新 Header 槽位，而不是作为列表中的普通
-React 子节点。提供它后，会覆盖 `headerStyle` 选中的 Classic 或 Material Header。当前自定义 Header 的
-固定逻辑高度为 `80`；应让内容在这个区域内完成布局。纯展示内容建议设置 `pointerEvents="none"`，避免
-截获列表的下拉手势。
+React 子节点。提供它后，会覆盖 `headerStyle` 选中的 Classic 或 Material Header。默认逻辑高度为 `80`，
+可用 `refreshHeaderHeight` 调整；内容布局应与该高度一致。纯展示内容建议设置 `pointerEvents="none"`，
+避免截获列表的下拉手势。
+
+`refreshHeaderSpinnerStyle` 支持 `scale`、`translate` 和 `fixed-behind`。`refreshHeaderTriggerRate`
+控制相对于 Header 高度的触发阈值，`refreshHeaderMaxDragRate` 控制真实最大下拉高度。最大倍率上限为 `9`，
+以避开 Android 内核将 `>= 10` 解释为物理像素高度的特殊语义；`onHeaderMoving.maxDragHeight` 会反映
+最终约束。`refreshHeaderFinishDuration` 是原生 Header 进入成功/失败完成态后的停留/完成动画时长，和
+`finishRefresh({ delay })` 延迟发起完成命令的含义不同。
 
 `onHeaderMoving` 在拖拽和松手回弹时都会发出事件。`offset`、`height`、`maxDragHeight` 均为跨平台一致的
-逻辑像素（Android dp / iOS pt）；`percent >= 1` 表示已达到刷新触发阈值。
+逻辑像素（Android dp / iOS pt）；`percent >= 1` 表示已达到刷新触发阈值。自定义 Header 的
+`onHeaderInitialized`、`onHeaderReleased` 和 `onHeaderStart` 都接收 `{ height, maxDragHeight }`；
+`onHeaderFinish` 接收原生完成回调给出的 `{ success }`，不是根据 JS Promise 推断出的结果。
 
 ### Classic 与 Material 配置
 
@@ -151,6 +168,18 @@ interface HeaderMovingEvent {
   maxDragHeight: number;
   /** 用户当前是否正在拖拽滚动视图。 */
   isDragging: boolean;
+}
+
+interface HeaderLifecycleEvent {
+  /** 原生 Header 高度，单位为逻辑像素（dp/pt）。 */
+  height: number;
+  /** 最大可下拉距离，单位为逻辑像素（dp/pt）。 */
+  maxDragHeight: number;
+}
+
+interface HeaderFinishEvent {
+  /** 原生 Header 完成态报告的结果。 */
+  success: boolean;
 }
 ```
 

@@ -158,8 +158,11 @@ export function LottieRefreshList() {
 }
 ```
 
-A custom Header is a fixed `80` logical-pixel native slot. `offset`, `height`, and `maxDragHeight` use Android dp /
-iOS pt; `percent >= 1` is the refresh threshold.
+A custom Header has a default `80` logical-pixel native slot, adjustable with `refreshHeaderHeight`. `offset`,
+`height`, and `maxDragHeight` use Android dp / iOS pt; `percent >= 1` is the refresh threshold. Configure its
+threshold, maximum pull, motion mode, or completion state with `refreshHeaderTriggerRate`,
+`refreshHeaderMaxDragRate`, `refreshHeaderSpinnerStyle`, and `refreshHeaderFinishDuration`; see
+[Customization](./customization) and the [API](../api/) for ranges and lifecycle payloads.
 
 ## Automatic loading
 

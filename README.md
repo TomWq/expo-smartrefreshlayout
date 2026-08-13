@@ -161,7 +161,10 @@ floorRef.current?.closeSecondFloor();
 ### 自定义刷新 Header
 
 `refreshHeader` 会作为真实的原生 Header 挂载，因而可直接放入 `LottieView` 等 React Native
-内容。通过 `onHeaderMoving` 取得跨平台一致的下拉进度和逻辑像素距离：
+内容。默认高度为 `80` dp/pt，可用 `refreshHeaderHeight` 调整；通过
+`refreshHeaderSpinnerStyle`、`refreshHeaderTriggerRate` 和 `refreshHeaderMaxDragRate`
+控制自定义 Header 的布局、触发阈值和真实最大拖动距离。速率有效范围分别为
+`(0, 1]` 和 `[1, 9]`。通过 `onHeaderMoving` 取得跨平台一致的下拉进度和逻辑像素距离：
 
 ```tsx
 const [headerProgress, setHeaderProgress] = useState(0);
@@ -177,7 +180,7 @@ const [headerProgress, setHeaderProgress] = useState(0);
 </SmartRefreshLayout>
 ```
 
-事件中的 `offset`、`height` 和 `maxDragHeight` 都是逻辑像素；`percent >= 1` 表示达到刷新阈值。自定义 Header 的逻辑高度为 `80`。
+事件中的 `offset`、`height` 和 `maxDragHeight` 都是逻辑像素；`percent >= 1` 表示达到刷新阈值。`onHeaderInitialized`、`onHeaderReleased` 和 `onHeaderStart` 分别对应原生尺寸初始化、明确释放和真正进入刷新动画，payload 都是 `{ height, maxDragHeight }`。`onHeaderFinish` 的 `{ success }` 来自原生完成回调，不是 JS Promise 的推断结果。`refreshHeaderFinishDuration` 表示完成态停留时长（毫秒）；它与 `finishRefresh({ delay })` 的“延迟发起完成”含义不同。
 
 ### Classic 与 Material Header 配置
 

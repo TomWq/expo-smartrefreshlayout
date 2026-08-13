@@ -313,6 +313,133 @@ it('mounts custom header content in the native slot and forwards header movement
   expect(onHeaderMoving).toHaveBeenCalledWith(movement);
 });
 
+it('normalizes custom header configuration before it reaches native', async () => {
+  const renderer = await renderLayout({
+    refreshHeader: React.createElement('mock-refresh-header'),
+    refreshHeaderHeight: Number.NaN,
+    refreshHeaderTriggerRate: Number.POSITIVE_INFINITY,
+    refreshHeaderMaxDragRate: -1,
+    refreshHeaderFinishDuration: -10,
+  });
+  const nativeView = renderer.root.findByType(NativeSmartRefreshLayout);
+  const headerSlot = renderer.root.findByType('NativeSmartRefreshHeaderSlot');
+
+  expect(nativeView.props.refreshHeaderHeight).toBe(80);
+  expect(nativeView.props.refreshHeaderSpinnerStyle).toBe('translate');
+  expect(nativeView.props.refreshHeaderTriggerRate).toBe(1);
+  expect(nativeView.props.refreshHeaderMaxDragRate).toBe(2);
+  expect(nativeView.props.refreshHeaderFinishDuration).toBe(0);
+  expect(headerSlot.props.style).toEqual(
+    expect.arrayContaining([expect.objectContaining({ height: 80 })])
+  );
+});
+
+it('forwards custom header geometry, spinner style, and completion duration', async () => {
+  const renderer = await renderLayout({
+    refreshHeader: React.createElement('mock-refresh-header'),
+    refreshHeaderHeight: 96.6,
+    refreshHeaderSpinnerStyle: 'fixed-behind',
+    refreshHeaderTriggerRate: 1.25,
+    refreshHeaderMaxDragRate: 2.5,
+    refreshHeaderFinishDuration: 350.4,
+  });
+  const nativeView = renderer.root.findByType(NativeSmartRefreshLayout);
+  const headerSlot = renderer.root.findByType('NativeSmartRefreshHeaderSlot');
+
+  expect(nativeView.props.refreshHeaderHeight).toBe(97);
+  expect(nativeView.props.refreshHeaderSpinnerStyle).toBe('fixed-behind');
+  expect(nativeView.props.refreshHeaderTriggerRate).toBe(1);
+  expect(nativeView.props.refreshHeaderMaxDragRate).toBe(2.5);
+  expect(nativeView.props.refreshHeaderFinishDuration).toBe(350);
+  expect(headerSlot.props.style).toEqual(
+    expect.arrayContaining([expect.objectContaining({ height: 97 })])
+  );
+});
+
+it('forwards dynamic custom header height and spinner style updates', async () => {
+  const renderer = await renderLayout({
+    refreshHeader: React.createElement('mock-refresh-header'),
+    refreshHeaderHeight: 80,
+    refreshHeaderSpinnerStyle: 'translate',
+  });
+
+  await act(async () => {
+    renderer.update(
+      <SmartRefreshLayout
+        refreshHeader={React.createElement('mock-refresh-header')}
+        refreshHeaderHeight={120}
+        refreshHeaderSpinnerStyle="scale"
+      >
+        <ScrollContent />
+      </SmartRefreshLayout>
+    );
+  });
+
+  const nativeView = renderer.root.findByType(NativeSmartRefreshLayout);
+  const headerSlot = renderer.root.findByType('NativeSmartRefreshHeaderSlot');
+  expect(nativeView.props.refreshHeaderHeight).toBe(120);
+  expect(nativeView.props.refreshHeaderSpinnerStyle).toBe('scale');
+  expect(headerSlot.props.style).toEqual(
+    expect.arrayContaining([expect.objectContaining({ height: 120 })])
+  );
+});
+
+it('uses multiplier-only custom header rate ranges shared by both native kernels', async () => {
+  const renderer = await renderLayout({
+    refreshHeaderTriggerRate: 2,
+    refreshHeaderMaxDragRate: 0.5,
+    refreshHeader: React.createElement('mock-refresh-header'),
+  });
+  const nativeView = renderer.root.findByType(NativeSmartRefreshLayout);
+
+  expect(nativeView.props.refreshHeaderTriggerRate).toBe(1);
+  expect(nativeView.props.refreshHeaderMaxDragRate).toBe(2);
+
+  await act(async () => {
+    renderer.update(
+      <SmartRefreshLayout
+        refreshHeader={React.createElement('mock-refresh-header')}
+        refreshHeaderTriggerRate={0.5}
+        refreshHeaderMaxDragRate={10}
+      >
+        <ScrollContent />
+      </SmartRefreshLayout>
+    );
+  });
+
+  const updatedNativeView = renderer.root.findByType(NativeSmartRefreshLayout);
+  expect(updatedNativeView.props.refreshHeaderTriggerRate).toBe(0.5);
+  expect(updatedNativeView.props.refreshHeaderMaxDragRate).toBe(9);
+});
+
+it('forwards custom header lifecycle events without their native event wrapper', async () => {
+  const onHeaderInitialized = jest.fn();
+  const onHeaderReleased = jest.fn();
+  const onHeaderStart = jest.fn();
+  const onHeaderFinish = jest.fn();
+  const renderer = await renderLayout({
+    refreshHeader: React.createElement('mock-refresh-header'),
+    onHeaderInitialized,
+    onHeaderReleased,
+    onHeaderStart,
+    onHeaderFinish,
+  });
+  const nativeView = renderer.root.findByType(NativeSmartRefreshLayout);
+  const lifecycle = { height: 96, maxDragHeight: 240 };
+
+  await act(async () => {
+    nativeView.props.onHeaderInitialized({ nativeEvent: lifecycle });
+    nativeView.props.onHeaderReleased({ nativeEvent: lifecycle });
+    nativeView.props.onHeaderStart({ nativeEvent: lifecycle });
+    nativeView.props.onHeaderFinish({ nativeEvent: { success: false } });
+  });
+
+  expect(onHeaderInitialized).toHaveBeenCalledWith(lifecycle);
+  expect(onHeaderReleased).toHaveBeenCalledWith(lifecycle);
+  expect(onHeaderStart).toHaveBeenCalledWith(lifecycle);
+  expect(onHeaderFinish).toHaveBeenCalledWith({ success: false });
+});
+
 it('forwards the official Classic header configuration to the native component', async () => {
   const renderer = await renderLayout({
     headerStyle: 'classic',

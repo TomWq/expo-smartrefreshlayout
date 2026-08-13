@@ -62,6 +62,10 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
 - (void)emitHeaderMovingWithOffset:(CGFloat)offset
                            percent:(CGFloat)percent
                         isDragging:(BOOL)isDragging;
+- (void)emitHeaderInitializedWithHeight:(CGFloat)height maxDragHeight:(CGFloat)maxDragHeight;
+- (void)emitHeaderReleasedWithHeight:(CGFloat)height maxDragHeight:(CGFloat)maxDragHeight;
+- (void)emitHeaderStartWithHeight:(CGFloat)height maxDragHeight:(CGFloat)maxDragHeight;
+- (void)emitHeaderFinishWithSuccess:(BOOL)success;
 - (NSInteger)allocateGestureRequestId;
 - (void)beginRefreshVisualOnly;
 - (void)beginLoadMoreVisualOnly;
@@ -76,6 +80,7 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
 - (void)detachFromScrollView;
 - (void)configureHeader;
 - (void)configureFooter;
+- (void)applyCustomHeaderConfigurationIfIdle;
 @end
 
 @implementation ExpoSmartRefreshLayoutView {
@@ -102,6 +107,12 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
   BOOL _suppressNextLoadMoreRequest;
   BOOL _refreshEventEmitted;
   BOOL _loadMoreEventEmitted;
+  CGFloat _refreshHeaderHeight;
+  RNSmartCustomHeaderSpinnerStyle _refreshHeaderSpinnerStyle;
+  CGFloat _refreshHeaderTriggerRate;
+  CGFloat _refreshHeaderMaxDragRate;
+  NSInteger _refreshHeaderFinishDuration;
+  BOOL _customHeaderConfigurationPending;
 
   // active 表示已开始的请求，scheduled 表示仍在等待 delayMs 的命令。
   // 两者共用一把操作锁，保证刷新和加载更多不能并发或重复触发。
@@ -133,6 +144,38 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
   NSString *_noMoreDataText;
 }
 
+- (void)emitHeaderInitializedWithHeight:(CGFloat)height maxDragHeight:(CGFloat)maxDragHeight
+{
+  auto emitter = std::static_pointer_cast<const ExpoSmartRefreshLayoutViewEventEmitter>(_eventEmitter);
+  if (emitter != nullptr) {
+    emitter->onHeaderInitialized({(int)std::lround(height), (int)std::lround(maxDragHeight)});
+  }
+}
+
+- (void)emitHeaderReleasedWithHeight:(CGFloat)height maxDragHeight:(CGFloat)maxDragHeight
+{
+  auto emitter = std::static_pointer_cast<const ExpoSmartRefreshLayoutViewEventEmitter>(_eventEmitter);
+  if (emitter != nullptr) {
+    emitter->onHeaderReleased({(int)std::lround(height), (int)std::lround(maxDragHeight)});
+  }
+}
+
+- (void)emitHeaderStartWithHeight:(CGFloat)height maxDragHeight:(CGFloat)maxDragHeight
+{
+  auto emitter = std::static_pointer_cast<const ExpoSmartRefreshLayoutViewEventEmitter>(_eventEmitter);
+  if (emitter != nullptr) {
+    emitter->onHeaderStart({(int)std::lround(height), (int)std::lround(maxDragHeight)});
+  }
+}
+
+- (void)emitHeaderFinishWithSuccess:(BOOL)success
+{
+  auto emitter = std::static_pointer_cast<const ExpoSmartRefreshLayoutViewEventEmitter>(_eventEmitter);
+  if (emitter != nullptr) {
+    emitter->onHeaderFinish({(bool)success});
+  }
+}
+
 + (ComponentDescriptorProvider)componentDescriptorProvider
 {
   return concreteComponentDescriptorProvider<ExpoSmartRefreshLayoutViewComponentDescriptor>();
@@ -159,6 +202,11 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
     _primaryColor = UIColor.clearColor;
     _materialProgressBackgroundColor = UIColor.whiteColor;
     _classicScrollMode = UISmartScrollModeMove;
+    _refreshHeaderHeight = 80;
+    _refreshHeaderSpinnerStyle = RNSmartCustomHeaderSpinnerStyleTranslate;
+    _refreshHeaderTriggerRate = 1;
+    _refreshHeaderMaxDragRate = 2;
+    _refreshHeaderFinishDuration = 0;
     self.clipsToBounds = YES;
   }
   return self;
@@ -226,9 +274,6 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
   if (_scrollView == nil) {
     [self attachToScrollView:RNSFindScrollView(_contentComponentView ?: self)];
   }
-  if ([_header isKindOfClass:[RNSmartCustomHeader class]] && _headerSlot != nil) {
-    [(RNSmartCustomHeader *)_header updateContentHeight:CGRectGetHeight(_headerSlot.bounds)];
-  }
 }
 
 - (void)updateProps:(Props::Shared const &)props oldProps:(Props::Shared const &)oldProps
@@ -243,6 +288,9 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
 
   // SmartRefreshControl 的样式和文案在组件实例上配置。相关 prop 改变时重建，
   // 避免旧 Header/Footer 留下内部布局或状态缓存。
+  BOOL customHeaderGeometryChanged =
+      oldViewProps.refreshHeaderHeight != newViewProps.refreshHeaderHeight ||
+      oldViewProps.refreshHeaderSpinnerStyle != newViewProps.refreshHeaderSpinnerStyle;
   BOOL rebuildHeader =
       oldViewProps.headerStyle != newViewProps.headerStyle ||
       oldViewProps.indicatorColor != newViewProps.indicatorColor ||
@@ -285,6 +333,26 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
       break;
   }
   _classicEnableLastTime = newViewProps.classicEnableLastTime;
+  _refreshHeaderHeight = newViewProps.refreshHeaderHeight > 0 ? newViewProps.refreshHeaderHeight : 80;
+  _refreshHeaderTriggerRate = newViewProps.refreshHeaderTriggerRate > 0
+      ? MIN(newViewProps.refreshHeaderTriggerRate, 1)
+      : 1;
+  _refreshHeaderMaxDragRate = newViewProps.refreshHeaderMaxDragRate >= 1
+      ? MIN(newViewProps.refreshHeaderMaxDragRate, 9)
+      : 2;
+  _refreshHeaderFinishDuration = MAX(0, newViewProps.refreshHeaderFinishDuration);
+  switch (newViewProps.refreshHeaderSpinnerStyle) {
+    case ExpoSmartRefreshLayoutViewRefreshHeaderSpinnerStyle::Scale:
+      _refreshHeaderSpinnerStyle = RNSmartCustomHeaderSpinnerStyleScale;
+      break;
+    case ExpoSmartRefreshLayoutViewRefreshHeaderSpinnerStyle::FixedBehind:
+      _refreshHeaderSpinnerStyle = RNSmartCustomHeaderSpinnerStyleFixedBehind;
+      break;
+    case ExpoSmartRefreshLayoutViewRefreshHeaderSpinnerStyle::Translate:
+    default:
+      _refreshHeaderSpinnerStyle = RNSmartCustomHeaderSpinnerStyleTranslate;
+      break;
+  }
   switch (newViewProps.classicSpinnerStyle) {
     case ExpoSmartRefreshLayoutViewClassicSpinnerStyle::Scale:
       _classicScrollMode = UISmartScrollModeStretch;
@@ -324,6 +392,19 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
       [self cancelOperation:RNSOperationKindRefresh];
       [_header removeFromSuperview];
       _header = nil;
+    } else if (_headerSlot != nil && [_header isKindOfClass:[RNSmartCustomHeader class]]) {
+      // Custom-header geometry is managed in place. Native Classic/Material
+      // settings are irrelevant here and must not tear down an active pull.
+      RNSmartCustomHeader *customHeader = (RNSmartCustomHeader *)_header;
+      customHeader.colorAccent = _indicatorColor;
+      customHeader.colorPrimary = UIColor.clearColor;
+      customHeader.triggerRate = _refreshHeaderTriggerRate;
+      customHeader.maxDragRate = _refreshHeaderMaxDragRate;
+      customHeader.finishDuration = _refreshHeaderFinishDuration / 1000.0;
+      if (customHeaderGeometryChanged) {
+        _customHeaderConfigurationPending = YES;
+        [self applyCustomHeaderConfigurationIfIdle];
+      }
     } else if (rebuildHeader || _header == nil || oldRefreshEnabled != _refreshEnabled) {
       [self configureHeader];
     }
@@ -338,7 +419,7 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
 
     // refreshing/loadingMore 是受控视觉状态。这里只同步动画，不创建 requestId，
     // 也不向 JS 重复发请求事件；真正的请求生命周期仍由手势或实例命令建立。
-    if ((!oldRefreshing || rebuildHeader) && newViewProps.refreshing && _header != nil) {
+    if ((!oldRefreshing || (rebuildHeader && _headerSlot == nil)) && newViewProps.refreshing && _header != nil) {
       [self beginRefreshVisualOnly];
     } else if (oldRefreshing && !newViewProps.refreshing &&
                _activeOperationKind != RNSOperationKindRefresh &&
@@ -473,6 +554,12 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
   };
   if (_headerSlot != nil) {
     RNSmartCustomHeader *customHeader = (RNSmartCustomHeader *)header;
+    customHeader.customSpinnerStyle = _refreshHeaderSpinnerStyle;
+    customHeader.triggerRate = _refreshHeaderTriggerRate;
+    customHeader.maxDragRate = _refreshHeaderMaxDragRate;
+    customHeader.finishDuration = _refreshHeaderFinishDuration / 1000.0;
+    [customHeader updateContentHeight:_refreshHeaderHeight];
+    _customHeaderConfigurationPending = NO;
     customHeader.statusChanged = ^(UIRefreshStatus oldStatus, UIRefreshStatus status) {
       ExpoSmartRefreshLayoutView *strongSelf = weakSelf;
       if (strongSelf != nil) {
@@ -483,6 +570,30 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
       ExpoSmartRefreshLayoutView *strongSelf = weakSelf;
       if (strongSelf != nil) {
         [strongSelf emitHeaderMovingWithOffset:offset percent:percent isDragging:isDragging];
+      }
+    };
+    customHeader.initialized = ^(CGFloat height, CGFloat maxDragHeight) {
+      ExpoSmartRefreshLayoutView *strongSelf = weakSelf;
+      if (strongSelf != nil) {
+        [strongSelf emitHeaderInitializedWithHeight:height maxDragHeight:maxDragHeight];
+      }
+    };
+    customHeader.released = ^(CGFloat height, CGFloat maxDragHeight) {
+      ExpoSmartRefreshLayoutView *strongSelf = weakSelf;
+      if (strongSelf != nil) {
+        [strongSelf emitHeaderReleasedWithHeight:height maxDragHeight:maxDragHeight];
+      }
+    };
+    customHeader.started = ^(CGFloat height, CGFloat maxDragHeight) {
+      ExpoSmartRefreshLayoutView *strongSelf = weakSelf;
+      if (strongSelf != nil) {
+        [strongSelf emitHeaderStartWithHeight:height maxDragHeight:maxDragHeight];
+      }
+    };
+    customHeader.finished = ^(BOOL success) {
+      ExpoSmartRefreshLayoutView *strongSelf = weakSelf;
+      if (strongSelf != nil) {
+        [strongSelf emitHeaderFinishWithSuccess:success];
       }
     };
   } else if (_materialHeader) {
@@ -517,6 +628,21 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
 
   _header = header;
   [header attach:_scrollView];
+}
+
+- (void)applyCustomHeaderConfigurationIfIdle
+{
+  RNSmartCustomHeader *customHeader =
+      [_header isKindOfClass:[RNSmartCustomHeader class]]
+          ? (RNSmartCustomHeader *)_header
+          : nil;
+  if (customHeader == nil || customHeader.status != UIRefreshStatusIdle) {
+    return;
+  }
+
+  customHeader.customSpinnerStyle = _refreshHeaderSpinnerStyle;
+  [customHeader updateContentHeight:_refreshHeaderHeight];
+  _customHeaderConfigurationPending = NO;
 }
 
 - (void)configureFooter
@@ -675,6 +801,9 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
       _didTriggerHeaderHaptic = NO;
       if (status == UIRefreshStatusIdle) {
         _suppressNextRefreshRequest = NO;
+        if (_customHeaderConfigurationPending) {
+          [self applyCustomHeaderConfigurationIfIdle];
+        }
       }
       [self emitState:@"idle"];
       break;
@@ -745,11 +874,12 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
   auto emitter = std::static_pointer_cast<const ExpoSmartRefreshLayoutViewEventEmitter>(_eventEmitter);
   if (emitter != nullptr) {
     CGFloat height = MAX(_header.expandHeight, 1);
+    CGFloat maxDragHeight = height * (_headerSlot != nil ? _refreshHeaderMaxDragRate : 2);
     emitter->onHeaderMoving({
       (Float)percent,
       (int)std::lround(offset),
       (int)std::lround(height),
-      (int)std::lround(height * 2),
+      (int)std::lround(maxDragHeight),
       (bool)isDragging,
     });
   }
@@ -848,6 +978,10 @@ typedef NS_ENUM(NSInteger, RNSOperationKind) {
                 : nil;
         if (classic != nil) {
           classic.showingCompletionText = success && strongSelf->_refreshCompleteText.length > 0;
+        }
+        if ([strongSelf->_header isKindOfClass:[RNSmartCustomHeader class]]) {
+          RNSmartCustomHeader *custom = (RNSmartCustomHeader *)strongSelf->_header;
+          custom.finishDuration = strongSelf->_refreshHeaderFinishDuration / 1000.0;
         }
         [strongSelf->_header finishRefreshWithSuccess:success];
         strongSelf->_refreshing = NO;

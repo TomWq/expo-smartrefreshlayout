@@ -306,7 +306,7 @@ export const styles = StyleSheet.create({
     height: 80,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#e6f4ff',
+    // backgroundColor: '#e6f4ff',
   },
   lottieAnimation: {
     width: 64,

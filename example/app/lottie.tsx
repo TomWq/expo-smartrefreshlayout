@@ -2,7 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, Text, View } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { SmartRefreshLayout } from 'expo-smartrefreshlayout';
-import type { HeaderMovingEvent, RefreshRequest } from 'expo-smartrefreshlayout';
+import type {
+  HeaderLifecycleEvent,
+  HeaderMovingEvent,
+  RefreshRequest,
+} from 'expo-smartrefreshlayout';
 
 import { createPage, getErrorMessage, requestSourceLabel, wait } from '../data';
 import { styles } from '../styles';
@@ -14,6 +18,7 @@ export default function LottieRefreshPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [headerProgress, setHeaderProgress] = useState(0);
   const [headerOffset, setHeaderOffset] = useState(0);
+  const [headerStarted, setHeaderStarted] = useState(false);
   const [notice, setNotice] = useState('下拉列表，观察 Header 动画随位移变化。');
 
   refreshingRef.current = refreshing;
@@ -46,13 +51,24 @@ export default function LottieRefreshPage() {
     try {
       await wait(900);
       setRevision((current) => current + 1);
-      setNotice('刷新完成');
+      setNotice('刷新请求已完成，等待原生 Header 收尾');
     } finally {
       refreshingRef.current = false;
       setRefreshing(false);
-      setHeaderProgress(0);
-      setHeaderOffset(0);
     }
+  }, []);
+
+  const handleHeaderStart = useCallback(({ height }: HeaderLifecycleEvent) => {
+    setHeaderStarted(true);
+    setHeaderProgress(1);
+    setHeaderOffset(Math.round(height));
+  }, []);
+
+  const handleHeaderFinish = useCallback(({ success }: { success: boolean }) => {
+    setHeaderStarted(false);
+    setHeaderProgress(0);
+    setHeaderOffset(0);
+    setNotice(success ? '刷新完成' : '刷新失败');
   }, []);
 
   const handleAnimationLoaded = useCallback(() => {
@@ -71,14 +87,14 @@ export default function LottieRefreshPage() {
           <LottieView
             ref={lottieRef}
             source={require('../assets/load.json')}
-            progress={refreshing ? undefined : headerProgress}
+            progress={headerStarted ? undefined : headerProgress}
             loop
             style={styles.lottieAnimation}
             resizeMode="contain"
             onAnimationLoaded={handleAnimationLoaded}
           />
           <Text style={styles.lottieHeaderText}>
-            {refreshing
+            {headerStarted
               ? '正在刷新...'
               : headerProgress >= 1
                 ? '松开刷新'
@@ -87,6 +103,11 @@ export default function LottieRefreshPage() {
         </View>
       }
       onHeaderMoving={handleHeaderMoving}
+      onHeaderStart={handleHeaderStart}
+      onHeaderFinish={handleHeaderFinish}
+      refreshHeaderHeight={80}
+      refreshHeaderSpinnerStyle="translate"
+      refreshHeaderFinishDuration={350}
       onRefresh={handleRefresh}
       onRefreshError={(error) => setNotice(`刷新失败 · ${getErrorMessage(error)}`)}
     >

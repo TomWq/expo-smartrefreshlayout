@@ -75,6 +75,29 @@ internal class ExpoSmartRefreshLayoutViewManager :
         putBoolean("isDragging", isDragging)
       })
     }
+    view.onHeaderInitialized = { height, maxDragHeight ->
+      emit("topHeaderInitialized", Arguments.createMap().apply {
+        putInt("height", height)
+        putInt("maxDragHeight", maxDragHeight)
+      })
+    }
+    view.onHeaderReleased = { height, maxDragHeight ->
+      emit("topHeaderReleased", Arguments.createMap().apply {
+        putInt("height", height)
+        putInt("maxDragHeight", maxDragHeight)
+      })
+    }
+    view.onHeaderStart = { height, maxDragHeight ->
+      emit("topHeaderStart", Arguments.createMap().apply {
+        putInt("height", height)
+        putInt("maxDragHeight", maxDragHeight)
+      })
+    }
+    view.onHeaderFinish = { success ->
+      emit("topHeaderFinish", Arguments.createMap().apply {
+        putBoolean("success", success)
+      })
+    }
   }
 
   override fun onDropViewInstance(view: ExpoSmartRefreshLayoutView) {
@@ -84,6 +107,10 @@ internal class ExpoSmartRefreshLayoutViewManager :
     view.onLoadMore = null
     view.onStateChange = null
     view.onHeaderMoving = null
+    view.onHeaderInitialized = null
+    view.onHeaderReleased = null
+    view.onHeaderStart = null
+    view.onHeaderFinish = null
     super.onDropViewInstance(view)
   }
 
@@ -101,6 +128,16 @@ internal class ExpoSmartRefreshLayoutViewManager :
   override fun setTitleColor(view: ExpoSmartRefreshLayoutView, value: Int?) = view.setTitleColor(value)
   override fun setClassicSpinnerStyle(view: ExpoSmartRefreshLayoutView, value: String?) =
     view.setClassicSpinnerStyle(value)
+  override fun setRefreshHeaderHeight(view: ExpoSmartRefreshLayoutView, value: Int) =
+    view.setRefreshHeaderHeight(value)
+  override fun setRefreshHeaderSpinnerStyle(view: ExpoSmartRefreshLayoutView, value: String?) =
+    view.setRefreshHeaderSpinnerStyle(value)
+  override fun setRefreshHeaderTriggerRate(view: ExpoSmartRefreshLayoutView, value: Float) =
+    view.setRefreshHeaderTriggerRate(value)
+  override fun setRefreshHeaderMaxDragRate(view: ExpoSmartRefreshLayoutView, value: Float) =
+    view.setRefreshHeaderMaxDragRate(value)
+  override fun setRefreshHeaderFinishDuration(view: ExpoSmartRefreshLayoutView, value: Int) =
+    view.setRefreshHeaderFinishDuration(value)
   override fun setClassicEnableLastTime(view: ExpoSmartRefreshLayoutView, value: Boolean) =
     view.setClassicEnableLastTime(value)
   override fun setMaterialShowBezierWave(view: ExpoSmartRefreshLayoutView, value: Boolean) =
@@ -147,7 +184,11 @@ internal class ExpoSmartRefreshLayoutViewManager :
       "topRefresh" to mutableMapOf("registrationName" to "onRefresh"),
       "topLoadMore" to mutableMapOf("registrationName" to "onLoadMore"),
       "topStateChange" to mutableMapOf("registrationName" to "onStateChange"),
-      "topHeaderMoving" to mutableMapOf("registrationName" to "onHeaderMoving")
+      "topHeaderMoving" to mutableMapOf("registrationName" to "onHeaderMoving"),
+      "topHeaderInitialized" to mutableMapOf("registrationName" to "onHeaderInitialized"),
+      "topHeaderReleased" to mutableMapOf("registrationName" to "onHeaderReleased"),
+      "topHeaderStart" to mutableMapOf("registrationName" to "onHeaderStart"),
+      "topHeaderFinish" to mutableMapOf("registrationName" to "onHeaderFinish")
     )
 
   companion object {

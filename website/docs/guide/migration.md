@@ -58,8 +58,12 @@ Expo 应用可以继续使用该库，但需要 development build 或本地原�
 ```
 
 `refreshHeader` 会把 React 内容挂载到两端原生 Header 槽位，而不是放入列表内容；提供后会覆盖
-Classic/Material Header。自定义 Header 当前固定为 `80` 逻辑像素高；`onHeaderMoving` 的
-`offset`、`height`、`maxDragHeight` 使用 dp/pt 逻辑像素，`percent >= 1` 表示到达刷新阈值。
+Classic/Material Header。自定义 Header 默认高 `80` 逻辑像素，可通过 `refreshHeaderHeight` 调整；
+`refreshHeaderSpinnerStyle`、`refreshHeaderTriggerRate`、`refreshHeaderMaxDragRate` 和
+`refreshHeaderFinishDuration` 提供跨端布局、阈值、最大拖动和完成态控制。`onHeaderMoving` 的 `offset`、
+`height`、`maxDragHeight` 使用 dp/pt 逻辑像素，`percent >= 1` 表示到达刷新阈值；新增的
+`onHeaderInitialized`、`onHeaderReleased`、`onHeaderStart` 返回 `{ height, maxDragHeight }`，
+`onHeaderFinish` 返回 `{ success }`。
 
 ## 3. 删除全局 Module 调用
 
@@ -98,7 +102,8 @@ const refreshRef = useRef<SmartRefreshLayoutRef>(null);
 
 - `renderFooter` 和 `DefaultRefreshHeader`
 - `onFooterMoving`
-- Header/Footer 高度、拖拽倍率、回弹时间等 Android 细粒度参数
+- 普通 Classic/Material Header/Footer 的高度、拖拽倍率、回弹时间等 Android 细粒度参数；
+  `refreshHeader` 专用的跨端高度、倍率和完成态配置除外
 - 旧 `classicRefreshHeaderProps`、`classicLoadMoreFooterProps` 对象形式；Classic/Material
   官方样式配置请改用 `classicSpinnerStyle`、`classicEnableLastTime`、
   `materialShowBezierWave`、`materialEnableHeaderTranslationContent` 和

@@ -15,6 +15,7 @@ export default function RootLayout() {
       <Stack.Screen name="classic" options={{ title: 'Classic 配置' }} />
       <Stack.Screen name="material" options={{ title: 'Material 配置' }} />
       <Stack.Screen name="lottie" options={{ title: 'Lottie 刷新' }} />
+      <Stack.Screen name="custom-header" options={{ title: '自定义 Header 验证' }} />
       <Stack.Screen name="second-floor" options={{ title: '淘宝二楼' }} />
     </Stack>
   );

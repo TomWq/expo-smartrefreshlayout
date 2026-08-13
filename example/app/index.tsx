@@ -21,6 +21,11 @@ const demos = [
     description: '自定义原生 Header，Lottie 进度跟随下拉位移。',
   },
   {
+    href: '/custom-header' as const,
+    title: '自定义 Header 验证',
+    description: '切换高度、布局、倍率和完成时长，查看原生事件与实时几何。',
+  },
+  {
     href: '/second-floor' as const,
     title: '淘宝二楼',
     description: 'Android 二楼下拉体验；其他平台显示支持提示。',

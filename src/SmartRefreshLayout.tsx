@@ -27,6 +27,17 @@ import type {
   SmartRefreshLayoutRef,
 } from './SmartRefreshLayout.types';
 
+const DEFAULT_CUSTOM_HEADER_HEIGHT = 80;
+const DEFAULT_CUSTOM_HEADER_TRIGGER_RATE = 1;
+const DEFAULT_CUSTOM_HEADER_MAX_DRAG_RATE = 2;
+const DEFAULT_CUSTOM_HEADER_FINISH_DURATION = 0;
+const MAX_CUSTOM_HEADER_HEIGHT = 10_000;
+const MAX_CUSTOM_HEADER_TRIGGER_RATE = 1;
+// SmartRefreshLayout interprets rates >= 10 as a physical-pixel height. Keep
+// this below 10 so both native kernels always receive a multiplier.
+const MAX_CUSTOM_HEADER_MAX_DRAG_RATE = 9;
+const MAX_CUSTOM_HEADER_FINISH_DURATION = 60_000;
+
 const DEFAULT_MESSAGES = {
   pullDown: 'Pull down to refresh',
   releaseToRefresh: 'Release to refresh',
@@ -44,6 +55,40 @@ function normalizeDelay(delay: number | undefined): number {
   }
 
   return Math.max(0, Math.round(delay));
+}
+
+function normalizePositiveNumber(
+  value: number | undefined,
+  fallback: number,
+  maximum: number
+): number {
+  if (value === undefined || !Number.isFinite(value) || value <= 0) {
+    return fallback;
+  }
+  return Math.min(value, maximum);
+}
+
+function normalizeNumberAtLeast(
+  value: number | undefined,
+  fallback: number,
+  minimum: number,
+  maximum: number
+): number {
+  if (value === undefined || !Number.isFinite(value) || value < minimum) {
+    return fallback;
+  }
+  return Math.min(value, maximum);
+}
+
+function normalizeNonNegativeNumber(
+  value: number | undefined,
+  fallback: number,
+  maximum: number
+): number {
+  if (value === undefined || !Number.isFinite(value) || value < 0) {
+    return fallback;
+  }
+  return Math.min(Math.round(value), maximum);
 }
 
 type OperationKind = 'refresh' | 'load-more';
@@ -69,6 +114,11 @@ export const SmartRefreshLayout = forwardRef<
   {
     children,
     refreshHeader,
+    refreshHeaderHeight,
+    refreshHeaderSpinnerStyle = 'translate',
+    refreshHeaderTriggerRate,
+    refreshHeaderMaxDragRate,
+    refreshHeaderFinishDuration,
     refreshEnabled,
     loadMoreEnabled,
     loadMoreMode,
@@ -93,6 +143,10 @@ export const SmartRefreshLayout = forwardRef<
     onLoadMoreError,
     onStateChange,
     onHeaderMoving,
+    onHeaderInitialized,
+    onHeaderReleased,
+    onHeaderStart,
+    onHeaderFinish,
     ...viewProps
   },
   forwardedRef
@@ -116,6 +170,29 @@ export const SmartRefreshLayout = forwardRef<
     loadMoreMode === 'auto' ||
     (loadMoreMode === undefined && autoLoadMoreEnabled);
   const resolvedMessages = { ...DEFAULT_MESSAGES, ...messages };
+  const normalizedRefreshHeaderHeight = Math.round(
+    normalizePositiveNumber(
+      refreshHeaderHeight,
+      DEFAULT_CUSTOM_HEADER_HEIGHT,
+      MAX_CUSTOM_HEADER_HEIGHT
+    )
+  );
+  const normalizedRefreshHeaderTriggerRate = normalizePositiveNumber(
+    refreshHeaderTriggerRate,
+    DEFAULT_CUSTOM_HEADER_TRIGGER_RATE,
+    MAX_CUSTOM_HEADER_TRIGGER_RATE
+  );
+  const normalizedRefreshHeaderMaxDragRate = normalizeNumberAtLeast(
+    refreshHeaderMaxDragRate,
+    DEFAULT_CUSTOM_HEADER_MAX_DRAG_RATE,
+    1,
+    MAX_CUSTOM_HEADER_MAX_DRAG_RATE
+  );
+  const normalizedRefreshHeaderFinishDuration = normalizeNonNegativeNumber(
+    refreshHeaderFinishDuration,
+    DEFAULT_CUSTOM_HEADER_FINISH_DURATION,
+    MAX_CUSTOM_HEADER_FINISH_DURATION
+  );
 
   /** 为 JS 发起的命令分配请求 id；上限与 Fabric Int32 事件/命令类型一致。 */
   const allocateProgrammaticRequestId = useCallback(() => {
@@ -482,6 +559,34 @@ export const SmartRefreshLayout = forwardRef<
     [onHeaderMoving]
   );
 
+  const handleHeaderInitialized = useCallback(
+    (event: NativeSyntheticEvent<{ height: number; maxDragHeight: number }>) => {
+      onHeaderInitialized?.(event.nativeEvent);
+    },
+    [onHeaderInitialized]
+  );
+
+  const handleHeaderReleased = useCallback(
+    (event: NativeSyntheticEvent<{ height: number; maxDragHeight: number }>) => {
+      onHeaderReleased?.(event.nativeEvent);
+    },
+    [onHeaderReleased]
+  );
+
+  const handleHeaderStart = useCallback(
+    (event: NativeSyntheticEvent<{ height: number; maxDragHeight: number }>) => {
+      onHeaderStart?.(event.nativeEvent);
+    },
+    [onHeaderStart]
+  );
+
+  const handleHeaderFinish = useCallback(
+    (event: NativeSyntheticEvent<{ success: boolean }>) => {
+      onHeaderFinish?.(event.nativeEvent);
+    },
+    [onHeaderFinish]
+  );
+
   return (
     <NativeSmartRefreshLayout
       {...viewProps}
@@ -498,6 +603,11 @@ export const SmartRefreshLayout = forwardRef<
       indicatorColor={indicatorColor}
       titleColor={titleColor}
       classicSpinnerStyle={classicSpinnerStyle}
+      refreshHeaderHeight={normalizedRefreshHeaderHeight}
+      refreshHeaderSpinnerStyle={refreshHeaderSpinnerStyle}
+      refreshHeaderTriggerRate={normalizedRefreshHeaderTriggerRate}
+      refreshHeaderMaxDragRate={normalizedRefreshHeaderMaxDragRate}
+      refreshHeaderFinishDuration={normalizedRefreshHeaderFinishDuration}
       classicEnableLastTime={classicEnableLastTime}
       materialShowBezierWave={materialShowBezierWave}
       materialEnableHeaderTranslationContent={materialEnableHeaderTranslationContent}
@@ -514,11 +624,15 @@ export const SmartRefreshLayout = forwardRef<
       onLoadMore={handleLoadMore}
       onStateChange={handleStateChange}
       onHeaderMoving={handleHeaderMoving}
+      onHeaderInitialized={handleHeaderInitialized}
+      onHeaderReleased={handleHeaderReleased}
+      onHeaderStart={handleHeaderStart}
+      onHeaderFinish={handleHeaderFinish}
     >
       {refreshHeader ? (
         <NativeSmartRefreshHeaderSlot
           collapsable={false}
-          style={styles.headerSlot}
+          style={[styles.headerSlot, { height: normalizedRefreshHeaderHeight }]}
         >
           {refreshHeader}
         </NativeSmartRefreshHeaderSlot>

@@ -159,6 +159,23 @@ internal class SlotRefreshHeader(
   context: Context,
   val slotHost: View,
 ) : FrameLayout(context), RefreshHeader {
+  private var customSpinnerStyle: SpinnerStyle = SpinnerStyle.Translate
+  private var headerHeightPx: Int = 1
+  var finishDurationMs: Int = 0
+  var initialized: ((height: Int, maxDragHeight: Int) -> Unit)? = null
+
+  fun setSpinnerStyle(value: SpinnerStyle) {
+    customSpinnerStyle = value
+    resetSlotTransform()
+  }
+
+  private fun resetSlotTransform() {
+    slotHost.scaleX = 1f
+    slotHost.scaleY = 1f
+    slotHost.pivotX = slotHost.width / 2f
+    slotHost.pivotY = 0f
+  }
+
   init {
     setBackgroundColor(android.graphics.Color.TRANSPARENT)
     addView(
@@ -172,18 +189,21 @@ internal class SlotRefreshHeader(
 
   override fun getView(): View = this
 
-  override fun getSpinnerStyle(): SpinnerStyle = SpinnerStyle.Translate
+  override fun getSpinnerStyle(): SpinnerStyle = customSpinnerStyle
 
   override fun setPrimaryColors(vararg colors: Int) = Unit
 
   override fun onInitialized(kernel: RefreshKernel, height: Int, maxDragHeight: Int) {
+    headerHeightPx = height.coerceAtLeast(1)
     val params = layoutParams
     if (params != null && params.height != height) {
       params.height = height
       layoutParams = params
     }
     minimumHeight = height.coerceAtLeast(0)
+    resetSlotTransform()
     requestLayout()
+    initialized?.invoke(height, maxDragHeight)
   }
 
   override fun onMoving(
@@ -192,13 +212,34 @@ internal class SlotRefreshHeader(
     offset: Int,
     height: Int,
     maxDragHeight: Int,
-  ) = Unit
+  ) {
+    if (!customSpinnerStyle.scale) {
+      resetSlotTransform()
+      return
+    }
 
-  override fun onReleased(refreshLayout: RefreshLayout, height: Int, maxDragHeight: Int) = Unit
+    // Scale the React-owned content with the pull distance. SmartRefreshLayout
+    // changes the header container geometry, but does not transform its child.
+    val baseHeight = height.coerceAtLeast(headerHeightPx).coerceAtLeast(1)
+    val maxScale = 1f + maxDragHeight.toFloat() / baseHeight
+    val scale = (offset.toFloat() / baseHeight).coerceIn(0f, maxScale)
+    slotHost.pivotX = slotHost.width / 2f
+    slotHost.pivotY = 0f
+    val visibleScale = scale.coerceAtLeast(0.01f)
+    slotHost.scaleX = visibleScale
+    slotHost.scaleY = visibleScale
+  }
+
+  override fun onReleased(refreshLayout: RefreshLayout, height: Int, maxDragHeight: Int) {
+    if (!customSpinnerStyle.scale) resetSlotTransform()
+  }
 
   override fun onStartAnimator(refreshLayout: RefreshLayout, height: Int, maxDragHeight: Int) = Unit
 
-  override fun onFinish(refreshLayout: RefreshLayout, success: Boolean): Int = 0
+  override fun onFinish(refreshLayout: RefreshLayout, success: Boolean): Int {
+    resetSlotTransform()
+    return finishDurationMs
+  }
 
   override fun onHorizontalDrag(percentX: Float, offsetX: Int, offsetMax: Int) = Unit
 

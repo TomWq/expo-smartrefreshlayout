@@ -53,9 +53,13 @@ Return a Promise from callbacks in uncontrolled mode instead of manually finishi
 | `onHeaderMoving` | `onHeaderMoving` with `percent`, `offset`, `height`, `maxDragHeight`, and `isDragging` |
 
 `refreshHeader` mounts React content into the native Header slot on both platforms instead of into list content, and
-replaces the Classic or Material header. The custom Header has a fixed logical height of `80`.
+replaces the Classic or Material header. The custom Header defaults to a logical height of `80`, adjustable with
+`refreshHeaderHeight`. `refreshHeaderSpinnerStyle`, `refreshHeaderTriggerRate`, `refreshHeaderMaxDragRate`, and
+`refreshHeaderFinishDuration` provide cross-platform motion, threshold, maximum-pull, and completion-state control.
 `onHeaderMoving` reports `offset`, `height`, and `maxDragHeight` in dp/pt logical pixels; `percent >= 1` is the
-refresh threshold.
+refresh threshold. `onHeaderInitialized`, `onHeaderReleased`, and `onHeaderStart` receive
+`{ height, maxDragHeight }`; `onHeaderFinish` receives `{ success }`.
 
 `renderFooter`, `DefaultRefreshHeader`, `onFooterMoving`, Paper support, and the old global module are not part of
-v2. Legacy Header/Footer height, drag-rate, and rebound-time tuning parameters also remain unsupported.
+v2. Legacy Android-only height, drag-rate, and rebound-time tuning for ordinary Classic/Material Headers and
+Footers remains unsupported; the cross-platform `refreshHeader` configuration above is the exception.
