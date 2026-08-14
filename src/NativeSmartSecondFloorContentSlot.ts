@@ -6,6 +6,5 @@ export interface NativeProps extends ViewProps {}
 type NativeComponent = HostComponent<NativeProps>;
 
 export default codegenNativeComponent<NativeProps>(
-  'ExpoSmartSecondFloorContentSlot',
-  { excludedPlatforms: ['iOS'] }
+  'ExpoSmartSecondFloorContentSlot'
 ) as NativeComponent;

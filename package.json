@@ -61,7 +61,11 @@
     "ios": {
       "componentProvider": {
         "ExpoSmartRefreshLayoutView": "ExpoSmartRefreshLayoutView",
-        "ExpoSmartRefreshHeaderSlot": "ExpoSmartRefreshHeaderSlotView"
+        "ExpoSmartRefreshHeaderSlot": "ExpoSmartRefreshHeaderSlotView",
+        "ExpoSmartSecondFloorLayoutView": "ExpoSmartSecondFloorLayoutView",
+        "ExpoSmartSecondFloorContentSlot": "ExpoSmartSecondFloorContentSlotView",
+        "ExpoSmartSecondFloorFloorSlot": "ExpoSmartSecondFloorFloorSlotView",
+        "ExpoSmartSecondFloorFloorContentSlot": "ExpoSmartSecondFloorFloorContentSlotView"
       }
     }
   },

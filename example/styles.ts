@@ -327,7 +327,7 @@ export const styles = StyleSheet.create({
   },
   taobaoHomeImage: {
     width: '100%',
-    aspectRatio: 400 / 1073,
+    // aspectRatio: 400 / 1073,
   },
   taobaoFloorImage: {
     ...StyleSheet.absoluteFillObject,

@@ -28,7 +28,7 @@ const demos = [
   {
     href: '/second-floor' as const,
     title: '淘宝二楼',
-    description: 'Android 二楼下拉体验；其他平台显示支持提示。',
+    description: 'Android / iOS 二楼下拉体验，支持背景揭露、全屏展开和上拉关闭。',
   },
 ];
 

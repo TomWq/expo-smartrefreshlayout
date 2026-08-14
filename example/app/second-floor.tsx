@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react';
-import { Image, Platform, ScrollView, Text, View } from 'react-native';
+import { Image, ScrollView, Text, View } from 'react-native';
 import { SmartSecondFloorLayout } from 'expo-smartrefreshlayout';
 import type { SmartSecondFloorLayoutRef } from 'expo-smartrefreshlayout';
 
@@ -12,21 +12,6 @@ import {
 import { styles } from '../styles';
 
 export default function SecondFloorDemoPage() {
-  if (Platform.OS !== 'android') {
-    return (
-      <View style={styles.androidOnlyNotice}>
-        <Text style={styles.androidOnlyTitle}>淘宝二楼仅支持 Android</Text>
-        <Text style={styles.androidOnlyText}>
-          iOS 继续使用 Classic 或 Material 下拉刷新，不挂载二楼原生组件。
-        </Text>
-      </View>
-    );
-  }
-
-  return <AndroidSecondFloorDemoPage />;
-}
-
-function AndroidSecondFloorDemoPage() {
   const layoutRef = useRef<SmartSecondFloorLayoutRef>(null);
 
   const refresh = useCallback(async () => {
@@ -38,30 +23,44 @@ function AndroidSecondFloorDemoPage() {
       <SmartSecondFloorLayout
         ref={layoutRef}
         style={styles.refreshLayout}
-        secondFloorBackground={
-          <Image
-            source={TAOBAO_SECOND_FLOOR_BACKGROUND_IMAGE}
-            style={styles.taobaoFloorImage}
-            resizeMode="cover"
-          />
-        }
+        // secondFloorBackground={
+        //   // <Image
+        //   //   source={TAOBAO_SECOND_FLOOR_BACKGROUND_IMAGE}
+        //   //   style={styles.taobaoFloorImage}
+        //   //   resizeMode="cover"
+        //   // />
+        //   <View style={{flex:1,justifyContent:'center',alignItems:'center'}}>
+        //     <Text>Second Floor</Text>
+        //   </View>
+        // }
         secondFloor={
-          <Image
-            source={TAOBAO_SECOND_FLOOR_CONTENT_IMAGE}
-            style={styles.taobaoFloorImage}
-            resizeMode="cover"
-          />
+          // <Image
+          //   source={TAOBAO_SECOND_FLOOR_CONTENT_IMAGE}
+          //   style={styles.taobaoFloorImage}
+          //   resizeMode="cover"
+          // />
+           <ScrollView style={{flex:1,backgroundColor:'green'}}>
+              {
+                new Array(100).fill(0).map((_, index) => (
+                  <View key={index} style={{height:50,backgroundColor:'yellow'}} > 
+                    <Text>Item {index}</Text>
+                  </View>
+                ))
+              }
+            </ScrollView>
         }
         hapticsEnabled
         primaryColor="transparent"
-        indicatorColor="#ffffff"
-        titleColor="#ffffff"
+        indicatorColor="#000000"
+        titleColor="#000000"
         classicEnableLastTime
         messages={{
           pullDown: '下拉刷新',
           releaseToRefresh: '释放刷新',
           refreshing: '正在刷新',
           refreshComplete: '刷新完成',
+          pullToSecondFloor: '下拉到第二层',
+          releaseToSecondFloor: '释放到第二层',
         }}
         onRefresh={refresh}
       >
@@ -69,7 +68,14 @@ function AndroidSecondFloorDemoPage() {
           style={styles.taobaoScroll}
           showsVerticalScrollIndicator={false}
         >
-          <Image source={TAOBAO_HOME_IMAGE} style={styles.taobaoHomeImage} resizeMode="cover" />
+          {/* <Image source={TAOBAO_HOME_IMAGE} style={styles.taobaoHomeImage} /> */}
+          {
+            new Array(100).fill(0).map((_, index) => (
+              <View key={index} style={{height:50,backgroundColor:'red'}} > 
+                <Text>Item {index}</Text>
+              </View>
+            ))
+          }
         </ScrollView>
       </SmartSecondFloorLayout>
     </View>

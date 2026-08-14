@@ -80,10 +80,10 @@ export function MessageList() {
 
 默认分页模式是 `loadMoreMode="pull"`，必须上拉并释放才触发。`loadMoreMode="auto"` 只有在内容超过一屏且用户真实向上滚动后才会解锁，不会在首次挂载或短列表时自行触发。一次请求完成后，下一次自动加载仍需要新的向上滚动。
 
-## 淘宝二楼（仅 Android）
+## 淘宝二楼
 
-`SmartSecondFloorLayout` 使用 Android SmartRefreshLayout 的 `TwoLevelHeader`。普通内容通过唯一的
-`children` 滚动子组件挂载，二楼通过独立的 `secondFloor` 槽位挂载。可选的
+`SmartSecondFloorLayout` 在 Android 使用 SmartRefreshLayout 的 `TwoLevelHeader`，iOS 使用等价的
+原生二楼交互。普通内容通过唯一的 `children` 滚动子组件挂载，二楼通过独立的 `secondFloor` 槽位挂载。可选的
 `secondFloorBackground` 会作为揭露背景放在其后，正式内容在原生打开动画时淡入。二楼可以使用
 `ScrollView` 或 `FlatList` 继续滚动，但该组件不提供上拉加载更多。
 
@@ -104,6 +104,7 @@ const floorRef = useRef<SmartSecondFloorLayoutRef>(null);
   floorRate={1.9}
   maxRate={2.5}
   refreshRate={1}
+  titleTextSize={18}
   secondFloor={
     <ScrollView nestedScrollEnabled>
       <View style={{ minHeight: 900, padding: 24 }}>
@@ -122,17 +123,18 @@ floorRef.current?.closeSecondFloor();
 
 `floorRate`、`maxRate`、`refreshRate` 分别控制进入二楼、最大拖拽和普通刷新阈值；默认值
 依次为 `1.9`、`2.5`、`1`。`floorDuration` 默认 `1000ms`，`pullToCloseEnabled` 默认开启，
-`bottomPullUpToCloseRate` 默认 `1/6`。打开和关闭命令只表示已派发到当前已挂载的 Android
+`bottomPullUpToCloseRate` 默认 `1/6`。打开和关闭命令只表示已派发到当前已挂载的原生
 实例，不等待动画完成；请用 `onSecondFloorOpen`、`onSecondFloorClose` 或 `onStateChange`
 观察生命周期。
 
 页面顶部有覆盖式 Toolbar 时，将其 dp 高度传给 `headerInset`。它会计入原生 Header 的实际
 高度，避免 Classic Header 被遮挡，并保持刷新和二楼拖拽阈值一致。
 
-二楼内部滚动与外层下拉手势共享触摸事件：只有在内部滚动到边界时，向下拖拽才适合用于
-关闭二楼；`nestedScrollEnabled` 可以改善 Android 嵌套滚动，但不能消除所有手势冲突。
-该组件不包含 iOS 原生实现，在 iOS 渲染时会抛出明确的 Android-only 错误，
-不会静默降级。
+`titleTextSize` 控制普通刷新及二楼状态提示的主文案字号，单位为逻辑 pt/sp，默认 `15`，支持
+`8` 到 `40`。它不影响“上次更新”等辅助文本。
+
+二楼内部滚动与外层手势共享触摸事件；`nestedScrollEnabled` 可以改善 Android 嵌套滚动，
+但不能消除所有手势冲突。两端均支持 `closeSecondFloor()` 命令关闭二楼。
 
 ## 定制显示
 

@@ -1,6 +1,8 @@
 package com.exposmartrefreshlayout
 
 import android.content.Context
+import android.util.TypedValue
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -11,15 +13,24 @@ import com.scwang.smart.refresh.layout.api.RefreshKernel
 import com.scwang.smart.refresh.layout.api.RefreshLayout
 import com.scwang.smart.refresh.layout.constant.RefreshState
 import com.scwang.smart.refresh.layout.constant.SpinnerStyle
+import kotlin.math.ceil
 
 internal class ConfiguredClassicsHeader(
   context: Context,
-  private val onHeaderInitialized: (ConfiguredClassicsHeader) -> Unit = {}
+  private val onHeaderInitialized: (ConfiguredClassicsHeader) -> Unit = {},
+  private val onTitleLayoutChanged: () -> Unit = {},
 ) : ClassicsHeader(context) {
+  private var transientTitle: String? = null
+  private var secondFloorPullingText: String? = null
+
   init {
     // ClassicsHeader 默认让进度图标以 GONE 启动；嵌入 TwoLevelHeader 后这会跳过首次布局，
     // 后续切到 VISIBLE 时仍是 0x0。改用 INVISIBLE 可保持占位和测量结果，同时不提前显示。
     mProgressView.visibility = View.INVISIBLE
+    mTitleText.visibility = View.VISIBLE
+    mTitleText.gravity =
+      (mTitleText.gravity and Gravity.VERTICAL_GRAVITY_MASK) or Gravity.CENTER_HORIZONTAL
+    updateStableTitleWidth()
   }
 
   override fun onInitialized(kernel: RefreshKernel, height: Int, maxDragHeight: Int) {
@@ -33,9 +44,23 @@ internal class ConfiguredClassicsHeader(
     newState: RefreshState,
   ) {
     super.onStateChanged(refreshLayout, oldState, newState)
+    // TwoLevelHeader 没有“继续下拉进入二楼”的独立状态，只有这段需要覆盖标题。
+    transientTitle?.let { mTitleText.text = it }
     if (newState == RefreshState.None && mProgressView.visibility == View.GONE) {
       mProgressView.visibility = View.INVISIBLE
     }
+  }
+
+  fun setTransientTitle(
+    value: String?,
+    refreshLayout: RefreshLayout,
+    currentState: RefreshState,
+  ) {
+    if (transientTitle == value) return
+    transientTitle = value
+    // Re-run the normal state rendering when clearing the override, so the
+    // "release to refresh" title is restored instead of retaining stale text.
+    onStateChanged(refreshLayout, currentState, currentState)
   }
 
   fun setMessages(
@@ -50,6 +75,23 @@ internal class ConfiguredClassicsHeader(
     release?.let { mTextRelease = it }
     refreshing?.let { mTextRefreshing = it }
     complete?.let { mTextFinish = it }
+    updateStableTitleWidth()
+    onStateChanged(refreshLayout, currentState, currentState)
+  }
+
+  fun setSecondFloorMessages(
+    pulling: String?,
+    release: String?,
+    refreshLayout: RefreshLayout,
+    currentState: RefreshState,
+  ) {
+    // 官方 ClassicsHeader 在 ReleaseToTwoLevel 状态读取这个字段，走原生状态机
+    // 才会得到与默认“释放进入二楼”一致的完整布局和箭头动画。
+    secondFloorPullingText = pulling
+    release?.let { mTextSecondary = it }
+    updateStableTitleWidth()
+    // Fabric 更新文案时组件可能正停在二楼临界状态；仅更新字段不会触发
+    // ClassicsHeader 重绘，因此需要按当前状态重新渲染并扩展标题容器。
     onStateChanged(refreshLayout, currentState, currentState)
   }
 
@@ -59,6 +101,38 @@ internal class ConfiguredClassicsHeader(
     mTitleText.setTextColor(titleColor)
     mLastUpdateText.setTextColor(titleColor)
     invalidate()
+  }
+
+  fun setTitleTextSizeSp(value: Float) {
+    mTitleText.setTextSize(TypedValue.COMPLEX_UNIT_SP, value)
+    updateStableTitleWidth()
+  }
+
+  private fun updateStableTitleWidth() {
+    // SmartRefreshLayout 拖拽时会缓存 Header 的测量结果。进入二楼后再扩宽标题已经太晚，
+    // 因此在手势开始前按所有状态文案的最大宽度固定一个 minWidth。
+    val titles = listOfNotNull(
+      mTextPulling,
+      mTextRelease,
+      mTextRefreshing,
+      mTextFinish,
+      mTextFailed,
+      mTextLoading,
+      mTextSecondary,
+      secondFloorPullingText,
+    )
+    val requiredWidth = titles.maxOfOrNull { title ->
+      ceil(mTitleText.paint.measureText(title)).toInt() +
+        mTitleText.compoundPaddingLeft +
+        mTitleText.compoundPaddingRight
+    } ?: 0
+    if (mTitleText.minWidth != requiredWidth) {
+      mTitleText.minWidth = requiredWidth
+      mTitleText.requestLayout()
+      (mTitleText.parent as? View)?.requestLayout()
+      requestLayout()
+      onTitleLayoutChanged()
+    }
   }
 }
 

@@ -20,6 +20,10 @@ export interface SecondFloorMessages {
   releaseToRefresh: string;
   refreshing: string;
   refreshComplete: string;
+  /** Displayed after crossing the normal-refresh range but before the floor threshold. */
+  pullToSecondFloor: string;
+  /** Displayed when releasing will open the second floor. */
+  releaseToSecondFloor: string;
 }
 
 export interface SmartSecondFloorLayoutProps extends ViewProps {
@@ -53,6 +57,11 @@ export interface SmartSecondFloorLayoutProps extends ViewProps {
   primaryColor?: ColorValue;
   indicatorColor?: ColorValue;
   titleColor?: ColorValue;
+  /**
+   * Font size of the refresh and second-floor status title, in logical
+   * points. Values are normalized to the 8-40 range.
+   */
+  titleTextSize?: number;
   classicEnableLastTime?: boolean;
   messages?: Partial<SecondFloorMessages>;
   onRefresh?: (request: SecondFloorRefreshRequest) => void | Promise<void>;

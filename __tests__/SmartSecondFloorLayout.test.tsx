@@ -79,6 +79,11 @@ it('mounts content, backdrop, and formal content through stable slot hosts', asy
         refreshRate={10}
         floorDuration={Number.NaN}
         bottomPullUpToCloseRate={-1}
+        titleTextSize={64}
+        messages={{
+          pullToSecondFloor: '继续下拉进入二楼',
+          releaseToSecondFloor: '释放进入二楼',
+        }}
         onRefresh={jest.fn()}
       >
         <Content />
@@ -103,6 +108,9 @@ it('mounts content, backdrop, and formal content through stable slot hosts', asy
   expect(nativeView.props.refreshRate).toBeCloseTo(1.1);
   expect(nativeView.props.floorDuration).toBe(1000);
   expect(nativeView.props.bottomPullUpToCloseRate).toBe(0.01);
+  expect(nativeView.props.titleTextSize).toBe(40);
+  expect(nativeView.props.pullToSecondFloorText).toBe('继续下拉进入二楼');
+  expect(nativeView.props.releaseToSecondFloorText).toBe('释放进入二楼');
 });
 
 it('keeps legacy secondFloor placement when no backdrop is supplied', async () => {
@@ -252,19 +260,19 @@ it('does not dispatch commands after the host is unmounted', async () => {
   expect(heldRef.beginRefresh()).toBe(false);
 });
 
-it('throws an explicit Android-only error on iOS', () => {
+it('mounts on iOS through the same Fabric slot hosts', () => {
   Object.defineProperty(Platform, 'OS', {
     configurable: true,
     value: 'ios',
   });
 
-  expect(() => {
+  expect(() =>
     act(() => {
       TestRenderer.create(
         <SmartSecondFloorLayout secondFloor={<Floor />}>
           <Content />
         </SmartSecondFloorLayout>
       );
-    });
-  }).toThrow('SmartSecondFloorLayout is Android-only');
+    })
+  ).not.toThrow();
 });

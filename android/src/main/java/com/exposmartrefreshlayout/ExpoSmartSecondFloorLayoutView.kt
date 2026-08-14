@@ -71,11 +71,17 @@ internal class ExpoSmartSecondFloorLayoutView(
   private var primaryColor: Int? = null
   private var indicatorColor: Int? = null
   private var titleColor: Int? = null
+  private var requestedTitleTextSize = DEFAULT_TITLE_TEXT_SIZE
   private var classicEnableLastTime = true
   private var pullDownText: String? = null
   private var releaseToRefreshText: String? = null
   private var refreshingText: String? = null
   private var refreshCompleteText: String? = null
+  // TwoLevelHeader renders its own native hints on Android. Keep the public
+  // strings here and render them through the wrapped ClassicsHeader because
+  // this library version does not expose setters for TwoLevelHeader itself.
+  private var pullToSecondFloorText: String? = null
+  private var releaseToSecondFloorText: String? = null
 
   var onRefresh: ((Int, String) -> Unit)? = null
   var onStateChange: ((String) -> Unit)? = null
@@ -100,13 +106,20 @@ internal class ExpoSmartSecondFloorLayoutView(
       setReboundDuration(300)
     }
 
-    classicHeader = ConfiguredClassicsHeader(context) { onClassicHeaderInitialized(it) }
+    classicHeader = ConfiguredClassicsHeader(
+      context,
+      { onClassicHeaderInitialized(it) },
+      { twoLevelHeader.requestHeaderRemeasure() },
+    )
     insetRefreshHeader = InsetRefreshHeader(context, classicHeader)
     twoLevelHeader.setRefreshHeader(insetRefreshHeader)
     twoLevelHeader.setOnTwoLevelListener {
       // TwoLevelHeader 在发布 ReleaseToTwoLevel 后才询问监听器，这是同一次手势的正常交接，
       // 不能按“重复打开”拒绝，所以允许 RELEASE 生命周期继续进入二楼。
       canOpenSecondFloor(allowReleasedGesture = true)
+    }
+    twoLevelHeader.onPullProgressChanged = { isDragging, percent ->
+      updateSecondFloorHint(isDragging, percent)
     }
     refreshLayout.setRefreshHeader(twoLevelHeader)
     refreshLayout.setRefreshContent(emptyContent)
@@ -283,6 +296,16 @@ internal class ExpoSmartSecondFloorLayoutView(
     applyClassicConfiguration()
   }
 
+  fun setTitleTextSize(value: Float) {
+    requestedTitleTextSize = clampFinite(
+      value,
+      DEFAULT_TITLE_TEXT_SIZE,
+      MIN_TITLE_TEXT_SIZE,
+      MAX_TITLE_TEXT_SIZE,
+    )
+    applyClassicConfiguration()
+  }
+
   fun setClassicEnableLastTime(value: Boolean) {
     classicEnableLastTime = value
     applyClassicConfiguration()
@@ -306,6 +329,18 @@ internal class ExpoSmartSecondFloorLayoutView(
   fun setRefreshCompleteText(value: String?) {
     refreshCompleteText = value
     applyClassicConfiguration()
+  }
+
+  fun setPullToSecondFloorText(value: String?) {
+    pullToSecondFloorText = value
+    applySecondFloorMessages()
+    refreshSecondFloorHint()
+  }
+
+  fun setReleaseToSecondFloorText(value: String?) {
+    releaseToSecondFloorText = value
+    applySecondFloorMessages()
+    refreshSecondFloorHint()
   }
 
   fun beginRefresh(requestId: Int, delayMs: Int) {
@@ -461,6 +496,7 @@ internal class ExpoSmartSecondFloorLayoutView(
     val title = titleColor ?: Color.DKGRAY
     classicHeader.setEnableLastTime(classicEnableLastTime)
     classicHeader.setColors(primary, indicator, title)
+    classicHeader.setTitleTextSizeSp(requestedTitleTextSize)
     classicHeader.setMessages(
       pullDownText,
       releaseToRefreshText,
@@ -469,6 +505,42 @@ internal class ExpoSmartSecondFloorLayoutView(
       refreshLayout,
       refreshLayout.state,
     )
+    applySecondFloorMessages()
+    refreshSecondFloorHint()
+  }
+
+  private fun applySecondFloorMessages() {
+    if (!::classicHeader.isInitialized) return
+    classicHeader.setSecondFloorMessages(
+      pullToSecondFloorText,
+      releaseToSecondFloorText,
+      refreshLayout,
+      refreshLayout.state,
+    )
+  }
+
+  private fun refreshSecondFloorHint() {
+    updateSecondFloorHint(
+      twoLevelHeader.isPullDragging,
+      twoLevelHeader.pullPercent,
+    )
+  }
+
+  private fun updateSecondFloorHint(isDragging: Boolean, percent: Float) {
+    if (!::classicHeader.isInitialized) return
+
+    val refreshThreshold = twoLevelHeader.refreshRate
+    val floorThreshold = twoLevelHeader.floorRate
+    val secondFloorHintThreshold = (refreshThreshold + floorThreshold) / 2f
+    val title = when {
+      !isDragging || !secondFloorEnabled || floorSlot == null -> null
+      // 到达 floorRate 后 TwoLevelHeader 会发布 ReleaseToTwoLevel，官方
+      // ClassicsHeader 自动渲染 mTextSecondary，不能再覆盖该状态文案。
+      percent >= floorThreshold -> null
+      percent > secondFloorHintThreshold -> pullToSecondFloorText
+      else -> null
+    }
+    classicHeader.setTransientTitle(title, refreshLayout, refreshLayout.state)
   }
 
   private fun onClassicHeaderInitialized(initializedHeader: RefreshHeader) {
@@ -714,6 +786,7 @@ internal class ExpoSmartSecondFloorLayoutView(
       }
       RefreshState.TwoLevelReleased -> {
         lifecycle = SecondFloorLifecycle.OPENING
+        refreshSecondFloorHint()
         // 官方效果会在二楼展开时同步开始内容淡入，默认 1000ms 展开对应 2000ms 淡入；
         // 自定义时长也保持这一比例，避免内容突兀出现。
         animateFloorContent(1f, configuredFloorDuration() * 2)
@@ -733,6 +806,7 @@ internal class ExpoSmartSecondFloorLayoutView(
       RefreshState.None -> {
         val wasOpen = secondFloorOpenedInCurrentCycle
         lifecycle = SecondFloorLifecycle.IDLE
+        refreshSecondFloorHint()
         secondFloorOpenedInCurrentCycle = false
         animateInsetRefreshHeader(1f, 0)
         setFloorContentAlpha(0f)
@@ -774,6 +848,30 @@ internal class ExpoSmartSecondFloorLayoutView(
   }
 
   private class ConfiguredTwoLevelHeader(context: Context) : TwoLevelHeader(context) {
+    var onPullProgressChanged: ((isDragging: Boolean, percent: Float) -> Unit)? = null
+    var isPullDragging = false
+      private set
+    var pullPercent = 0f
+      private set
+
+    val refreshRate: Float
+      get() = mRefreshRate
+    val floorRate: Float
+      get() = mFloorRate
+
+    override fun onMoving(
+      isDragging: Boolean,
+      percent: Float,
+      offset: Int,
+      height: Int,
+      maxDragHeight: Int,
+    ) {
+      super.onMoving(isDragging, percent, offset, height, maxDragHeight)
+      isPullDragging = isDragging
+      pullPercent = percent
+      onPullProgressChanged?.invoke(isDragging, percent)
+    }
+
     fun requestHeaderRemeasure() {
       // SmartRefreshLayout 会缓存测量后的 Header 高度；同时清空 TwoLevelHeader 的副本，
       // 才能在 inset 变化后重新计算拖拽阈值。
@@ -839,6 +937,7 @@ internal class ExpoSmartSecondFloorLayoutView(
     const val DEFAULT_MAX_RATE = 2.5f
     const val DEFAULT_FLOOR_RATE = 1.9f
     const val DEFAULT_REFRESH_RATE = 1f
+    const val DEFAULT_TITLE_TEXT_SIZE = 15f
     const val DEFAULT_FLOOR_DURATION = 1000
     const val DEFAULT_BOTTOM_PULL_UP_TO_CLOSE_RATE = 1f / 6f
     const val MIN_MAX_RATE = 1.2f
@@ -850,5 +949,7 @@ internal class ExpoSmartSecondFloorLayoutView(
     const val MAX_BOTTOM_PULL_UP_TO_CLOSE_RATE = 0.5f
     const val MAX_FLOOR_DURATION = 10_000
     const val MAX_HEADER_INSET_DP = 10_000
+    const val MIN_TITLE_TEXT_SIZE = 8f
+    const val MAX_TITLE_TEXT_SIZE = 40f
   }
 }

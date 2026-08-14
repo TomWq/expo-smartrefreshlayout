@@ -51,11 +51,14 @@ export interface NativeProps extends ViewProps {
   primaryColor?: ColorValue;
   indicatorColor?: ColorValue;
   titleColor?: ColorValue;
+  titleTextSize?: CodegenTypes.WithDefault<CodegenTypes.Float, 15>;
   classicEnableLastTime?: CodegenTypes.WithDefault<boolean, true>;
   pullDownText?: string;
   releaseToRefreshText?: string;
   refreshingText?: string;
   refreshCompleteText?: string;
+  pullToSecondFloorText?: string;
+  releaseToSecondFloorText?: string;
   onRefresh?: CodegenTypes.DirectEventHandler<RequestEvent>;
   onStateChange?: CodegenTypes.DirectEventHandler<StateChangeEvent>;
   onSecondFloorOpen?: CodegenTypes.DirectEventHandler<null>;
@@ -90,8 +93,4 @@ export const Commands = codegenNativeCommands<NativeCommands>({
   ],
 });
 
-// Android-only Fabric 组件；iOS 平台由 codegen 明确排除。
-export default codegenNativeComponent<NativeProps>(
-  'ExpoSmartSecondFloorLayoutView',
-  { excludedPlatforms: ['iOS'] }
-);
+export default codegenNativeComponent<NativeProps>('ExpoSmartSecondFloorLayoutView');

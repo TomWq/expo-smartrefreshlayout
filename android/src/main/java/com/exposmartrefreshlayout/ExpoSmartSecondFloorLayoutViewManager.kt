@@ -111,6 +111,9 @@ internal class ExpoSmartSecondFloorLayoutViewManager :
   override fun setTitleColor(view: ExpoSmartSecondFloorLayoutView, value: Int?) =
     view.setTitleColor(value)
 
+  override fun setTitleTextSize(view: ExpoSmartSecondFloorLayoutView, value: Float) =
+    view.setTitleTextSize(value)
+
   override fun setClassicEnableLastTime(view: ExpoSmartSecondFloorLayoutView, value: Boolean) =
     view.setClassicEnableLastTime(value)
 
@@ -125,6 +128,12 @@ internal class ExpoSmartSecondFloorLayoutViewManager :
 
   override fun setRefreshCompleteText(view: ExpoSmartSecondFloorLayoutView, value: String?) =
     view.setRefreshCompleteText(value)
+
+  override fun setPullToSecondFloorText(view: ExpoSmartSecondFloorLayoutView, value: String?) =
+    view.setPullToSecondFloorText(value)
+
+  override fun setReleaseToSecondFloorText(view: ExpoSmartSecondFloorLayoutView, value: String?) =
+    view.setReleaseToSecondFloorText(value)
 
   override fun beginRefresh(view: ExpoSmartSecondFloorLayoutView, requestId: Int, delayMs: Int) =
     view.beginRefresh(requestId, delayMs)

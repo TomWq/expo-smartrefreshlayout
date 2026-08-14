@@ -6,7 +6,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Platform, StyleSheet, type NativeSyntheticEvent } from 'react-native';
+import { StyleSheet, type NativeSyntheticEvent } from 'react-native';
 
 import NativeSmartSecondFloorContentSlot from './NativeSmartSecondFloorContentSlot';
 import NativeSmartSecondFloorFloorContentSlot from './NativeSmartSecondFloorFloorContentSlot';
@@ -30,6 +30,8 @@ const DEFAULT_MESSAGES = {
   releaseToRefresh: 'Release to refresh',
   refreshing: 'Refreshing...',
   refreshComplete: 'Refresh complete',
+  pullToSecondFloor: 'Pull down to enter second floor',
+  releaseToSecondFloor: 'Release to enter second floor',
 } as const;
 
 const MIN_MAX_RATE = 1.2;
@@ -41,6 +43,8 @@ const MIN_BOTTOM_PULL_UP_TO_CLOSE_RATE = 0.01;
 const MAX_BOTTOM_PULL_UP_TO_CLOSE_RATE = 0.5;
 const MAX_FLOOR_DURATION = 10_000;
 const MAX_HEADER_INSET = 10_000;
+const MIN_TITLE_TEXT_SIZE = 8;
+const MAX_TITLE_TEXT_SIZE = 40;
 
 type RefreshOperation = {
   /** 原生请求事件回传的 id；完成命令必须匹配它。 */
@@ -173,6 +177,7 @@ export const SmartSecondFloorLayout = forwardRef<
     primaryColor,
     indicatorColor,
     titleColor,
+    titleTextSize: requestedTitleTextSize,
     classicEnableLastTime = true,
     messages,
     onRefresh,
@@ -184,13 +189,6 @@ export const SmartSecondFloorLayout = forwardRef<
   },
   forwardedRef
 ) {
-  if (Platform.OS !== 'android') {
-    // TwoLevelHeader 仅存在于 Android，iOS 渲染前直接给出明确错误。
-    throw new Error(
-      'SmartSecondFloorLayout is Android-only because iOS has no native TwoLevelHeader equivalent.'
-    );
-  }
-
   const nativeRef = useRef<React.ElementRef<typeof NativeSmartSecondFloorLayout>>(null);
   const [internalRefreshing, setInternalRefreshing] = useState(false);
   const refreshOperationRef = useRef<RefreshOperation | null>(null);
@@ -201,6 +199,11 @@ export const SmartSecondFloorLayout = forwardRef<
   const secondFloorStateRef = useRef<SecondFloorState>('idle');
   const refreshing = controlledRefreshing ?? internalRefreshing;
   const resolvedMessages = { ...DEFAULT_MESSAGES, ...messages };
+  const titleTextSize = clamp(
+    finiteOr(requestedTitleTextSize, 15),
+    MIN_TITLE_TEXT_SIZE,
+    MAX_TITLE_TEXT_SIZE
+  );
   const configuration = normalizeConfiguration({
     maxRate,
     floorRate,
@@ -439,11 +442,14 @@ export const SmartSecondFloorLayout = forwardRef<
       primaryColor={primaryColor}
       indicatorColor={indicatorColor}
       titleColor={titleColor}
+      titleTextSize={titleTextSize}
       classicEnableLastTime={classicEnableLastTime}
       pullDownText={resolvedMessages.pullDown}
       releaseToRefreshText={resolvedMessages.releaseToRefresh}
       refreshingText={resolvedMessages.refreshing}
       refreshCompleteText={resolvedMessages.refreshComplete}
+      pullToSecondFloorText={resolvedMessages.pullToSecondFloor}
+      releaseToSecondFloorText={resolvedMessages.releaseToSecondFloor}
       onRefresh={handleRefresh}
       onStateChange={handleStateChange}
       onSecondFloorOpen={handleSecondFloorOpen}
